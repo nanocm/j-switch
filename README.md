@@ -6,7 +6,7 @@ A JDK manager with builds for Windows, macOS, and Linux. This repository is a [f
 
 ## Validation status
 
-Windows operation has been confirmed by the repository owner. For Linux and macOS, CI has compiled and run unit tests on hosted runners (including a shell test with simulated Java executables), and the release archives have passed checksum and architecture checks. At the v0.2.0 release, a full `jsh download` → `jsh list` → `jsh use` run with a real JDK had not been verified on Linux or macOS. These builds should be treated as needing real-world validation.
+Windows operation has been confirmed by the repository owner and Windows CI tests. On hosted Linux x64, macOS Intel, and macOS ARM64 runners, an on-demand smoke test downloaded a real Temurin 21 JDK, found it with `jsh list`, switched from Java 17 to 21 in one open bash shell, and checked `java`, `javac`, and `jsh current`. Releases now require that smoke test to pass. This validates those runner environments; other machine and shell setups may behave differently.
 
 ## Install
 
@@ -56,7 +56,7 @@ The setting applies to your Windows account. Keep the installation directory und
 
 ### macOS and Linux
 
-`jsh use` creates a `jsh-current` symbolic link beside the executable and updates the managed lines in your `.zshrc` or `.bashrc` to use it. Run `source ~/.zshrc` or `source ~/.bashrc` once in the current shell. After that, `jsh use` retargets the link, so Java commands in that open shell use the new JDK immediately. New bash and zsh shells read the updated profile automatically. Other shells are not configured automatically.
+`jsh use` creates a `jsh-current` symbolic link beside the executable and updates the managed lines in your `.zshrc` or `.bashrc` to use it. Run `source ~/.zshrc` or `source ~/.bashrc` once in the current shell. After that, `jsh use` retargets the link, so Java commands in that open shell use the new JDK immediately. New shells that load the updated profile inherit the setting; bash login shells may need to source `.bashrc` from `.bash_profile`. Other shells are not configured automatically.
 
 ## Configuration
 
@@ -80,4 +80,4 @@ cargo test --locked
 cargo build --release --locked
 ```
 
-See [release notes](RELEASE_NOTES.md) for changes in v0.2.0. Licensed under [MIT](LICENSE).
+See [release notes](RELEASE_NOTES.md) for changes in v0.2.1. Licensed under [MIT](LICENSE).

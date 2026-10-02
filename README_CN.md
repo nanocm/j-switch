@@ -6,7 +6,7 @@
 
 ## 验证范围
 
-仓库所有者已确认 Windows 可用。Linux 和 macOS 在 GitHub 托管运行器上通过了编译、单元测试（包括使用模拟 Java 可执行文件的 shell 切换测试）；发布包的校验值和架构也已核对。但在 v0.2.0 发布时，尚未在 Linux 或 macOS 上用真实 JDK 完整验证 `jsh download` → `jsh list` → `jsh use`。这些平台的构建产物仍需实际使用验证。
+仓库所有者已确认 Windows 可用，Windows CI 测试也已通过。在 GitHub 托管的 Linux x64、macOS Intel 和 macOS ARM64 运行器上，真实流程测试下载了 Temurin 21，通过 `jsh list` 找到它，在同一个 bash 终端中从 Java 17 切换到 21，并检查了 `java`、`javac` 和 `jsh current`。今后的发布必须通过这项测试。这些结果只覆盖对应的运行器环境，其他机器和 shell 配置仍可能不同。
 
 ## 安装
 
@@ -56,7 +56,7 @@ jsh current
 
 ### macOS 和 Linux
 
-`jsh use` 会在可执行文件旁建立 `jsh-current` 符号链接，并把 `.zshrc` 或 `.bashrc` 中由 jsh 管理的配置改为指向该链接。首次配置后在当前终端运行一次 `source ~/.zshrc` 或 `source ~/.bashrc`。之后运行 `jsh use` 只需切换链接目标，已打开终端中的 Java 命令会立即使用新 JDK。新的 bash 和 zsh 终端会自动读取配置；其他 shell 暂不自动配置。
+`jsh use` 会在可执行文件旁建立 `jsh-current` 符号链接，并把 `.zshrc` 或 `.bashrc` 中由 jsh 管理的配置改为指向该链接。首次配置后在当前终端运行一次 `source ~/.zshrc` 或 `source ~/.bashrc`。之后运行 `jsh use` 只需切换链接目标，已打开终端中的 Java 命令会立即使用新 JDK。会加载相应配置文件的新终端也能继承设置；bash 登录终端可能还需要从 `.bash_profile` 加载 `.bashrc`。其他 shell 暂不自动配置。
 
 ## 配置文件
 
@@ -80,4 +80,4 @@ cargo test --locked
 cargo build --release --locked
 ```
 
-参阅 [v0.2.0 发布说明](RELEASE_NOTES.md)。本项目使用 [MIT 许可证](LICENSE)。
+参阅 [v0.2.1 发布说明](RELEASE_NOTES.md)。本项目使用 [MIT 许可证](LICENSE)。
