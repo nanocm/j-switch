@@ -165,6 +165,12 @@ impl JdkDetector {
                 return junction::get_target(path).ok();
             }
         }
+        #[cfg(unix)]
+        {
+            if path.symlink_metadata().ok()?.file_type().is_symlink() {
+                return path.canonicalize().ok();
+            }
+        }
         Some(path.to_path_buf())
     }
     
@@ -265,5 +271,16 @@ OpenJDK 64-Bit Server VM Temurin-17.0.2+8 (build 17.0.2+8, mixed mode)"#;
         assert!(crate::config::same_jdk_path(
             &JdkDetector::installation_path(&link).unwrap(), &target
         ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn jsh_symlink_registers_its_real_target() {
+        let temp = tempfile::tempdir().unwrap();
+        let target = temp.path().join("jdk");
+        std::fs::create_dir(&target).unwrap();
+        let link = temp.path().join("jsh-current");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        assert_eq!(JdkDetector::installation_path(&link).unwrap(), target);
     }
 }

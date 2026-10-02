@@ -45,13 +45,18 @@ pub fn use_command(version: &str) -> Result<()> {
 
     #[cfg(not(target_os = "windows"))]
     {
-        println!("\n{}", "Note:".yellow().bold());
-        let rc_path = if std::env::var("SHELL").unwrap_or_default().contains("zsh") {
-            "~/.zshrc"
+        if env_updater.shell_uses_link()? {
+            println!("  This terminal already uses the stable JDK path; java commands switch immediately.");
         } else {
-            "~/.bashrc"
-        };
-        println!("  Please run: {}", format!("source {}", rc_path).green());
+            let rc_path = if std::env::var("SHELL").unwrap_or_default().ends_with("zsh") {
+                "~/.zshrc"
+            } else {
+                "~/.bashrc"
+            };
+            println!("\n{}", "One-time setup:".yellow().bold());
+            println!("  Run {} in this terminal.", format!("source {rc_path}").green());
+            println!("  Future jsh use commands will then affect this open terminal immediately.");
+        }
     }
     
     Ok(())

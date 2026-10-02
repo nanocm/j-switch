@@ -12,7 +12,7 @@
 cargo build --release --locked
 ```
 
-Windows 产物是 `target/release/jsh.exe`，其他系统是 `target/release/jsh`。请将可执行文件及其旁边的 `config.json`、`jdks`、`downloads` 和 Windows 上的 `jsh-current` 保存在同一位置。Windows 上请选一个普通用户可写的专用目录，不要把 `jsh.exe` 放在 `Program Files` 或 Windows 系统目录下。将可执行文件所在目录加入 `PATH` 后，即可在任意终端运行 `jsh`。
+Windows 产物是 `target/release/jsh.exe`，其他系统是 `target/release/jsh`。请将可执行文件及其旁边的 `config.json`、`jdks`、`downloads` 和 `jsh-current` 保存在同一位置。请选择普通用户可写的专用目录；Windows 上不要把 `jsh.exe` 放在 `Program Files` 或 Windows 系统目录下。将可执行文件所在目录加入 `PATH` 后，即可在任意终端运行 `jsh`。
 
 ## 命令
 
@@ -52,7 +52,7 @@ jsh current
 
 ### macOS 和 Linux
 
-`jsh use` 会更新 `.zshrc` 或 `.bashrc` 中由 jsh 管理的配置。若要在当前终端生效，请按所用 shell 运行 `source ~/.zshrc` 或 `source ~/.bashrc`。新终端会自动读取更新后的配置。
+`jsh use` 会在可执行文件旁建立 `jsh-current` 符号链接，并把 `.zshrc` 或 `.bashrc` 中由 jsh 管理的配置改为指向该链接。首次配置后在当前终端运行一次 `source ~/.zshrc` 或 `source ~/.bashrc`。之后运行 `jsh use` 只需切换链接目标，已打开终端中的 Java 命令会立即使用新 JDK。新的 bash 和 zsh 终端会自动读取配置；其他 shell 暂不自动配置。
 
 ## 配置文件
 

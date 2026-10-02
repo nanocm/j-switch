@@ -12,7 +12,7 @@ Download a binary from [Releases](https://github.com/nanocm/j-switch/releases), 
 cargo build --release --locked
 ```
 
-The binary is `target/release/jsh.exe` on Windows and `target/release/jsh` elsewhere. Keep the binary, its `config.json`, `jdks`, `downloads`, and (on Windows) `jsh-current` in one location. On Windows, choose a dedicated directory that your normal account can write without elevation; do not put `jsh.exe` under `Program Files` or the Windows directory. Add that directory to your `PATH` so `jsh` can be called from any terminal.
+The binary is `target/release/jsh.exe` on Windows and `target/release/jsh` elsewhere. Keep the binary, its `config.json`, `jdks`, `downloads`, and `jsh-current` in one location. Choose a dedicated directory that your normal account can write without elevation; on Windows, do not put `jsh.exe` under `Program Files` or the Windows directory. Add that directory to your `PATH` so `jsh` can be called from any terminal.
 
 ## Commands
 
@@ -52,7 +52,7 @@ The setting applies to your Windows account. Keep the installation directory und
 
 ### macOS and Linux
 
-`jsh use` updates the managed lines in your `.zshrc` or `.bashrc`. Run `source ~/.zshrc` or `source ~/.bashrc` in the current shell, as appropriate. New shells read the updated profile automatically.
+`jsh use` creates a `jsh-current` symbolic link beside the executable and updates the managed lines in your `.zshrc` or `.bashrc` to use it. Run `source ~/.zshrc` or `source ~/.bashrc` once in the current shell. After that, `jsh use` retargets the link, so Java commands in that open shell use the new JDK immediately. New bash and zsh shells read the updated profile automatically. Other shells are not configured automatically.
 
 ## Configuration
 
