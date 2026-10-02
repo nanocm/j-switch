@@ -1,88 +1,147 @@
-use crate::config::{Config, JdkInfo}; // [注释] 引入Config配置类和JdkInfo信息结构体
-use crate::error::{JdkError, Result}; // [注释] 引入自定义错误类型和Result别名
-use crate::jdk::detector::JdkDetector; // [注释] 引入JdkDetector类，用于检测和扫描系统JDK
+use crate::config::{Config, JdkInfo, same_jdk_path};
+use crate::error::{JdkError, Result};
+use crate::jdk::detector::JdkDetector;
+use std::path::Path;
 
-pub struct JdkManager { // [注释] 定义公共结构体JdkManager，JDK管理器，封装JDK的核心操作
-    config: Config, // [注释] 私有字段config，存储JDK配置信息
+pub struct JdkManager {
+    config: Config,
 }
 
-impl JdkManager { // [注释] 为JdkManager结构体实现方法
-    pub fn new() -> Result<Self> { // [注释] 公共关联函数，创建新的JdkManager实例，加载现有配置
-        let config = Config::load()?; // [注释] 从磁盘加载配置文件，如果失败则传播错误
-        Ok(Self { config }) // [注释] 构造JdkManager实例并返回，使用字段初始化简写
+impl JdkManager {
+    pub fn new() -> Result<Self> {
+        let mut config = Config::load()?;
+        if config.normalize_registry()? { config.save()?; }
+        Ok(Self { config })
     }
 
-    pub fn config(&self) -> &Config { // [注释] 公共方法，返回配置对象的不可变引用
-        &self.config // [注释] 返回config字段的引用，不转移所有权
-    }
-
-    pub fn config_mut(&mut self) -> &mut Config { // [注释] 公共方法，返回配置对象的可变引用，允许修改
-        &mut self.config // [注释] 返回config字段的可变引用
-    }
-
-    /// Scan and update JDK registry
-    pub fn scan_jdks(&mut self) -> Result<Vec<JdkInfo>> { // [注释] 公共方法，扫描系统中的所有JDK并更新注册表
-        let detected = JdkDetector::detect_all()?; // [注释] 调用JdkDetector扫描系统中所有JDK，返回Vec<JdkInfo>
-        
-        // Update config with newly found JDKs
-        for jdk in &detected { // [注释] 遍历检测到的每个JDK信息
-            let key = jdk.version.clone(); // [注释] 克隆版本号作为HashMap的键
-            if !self.config.jdks.contains_key(&key) { // [注释] 检查该版本是否已经在配置中存在
-                self.config.add_jdk(key, jdk.clone()); // [注释] 如果是新发现的JDK，添加到配置中
+    /// Refresh managed installs and JAVA_HOME. A system scan is explicit
+    /// because walking drive roots makes an ordinary list unnecessarily slow.
+    pub fn scan_jdks(&mut self, scan_system: bool) -> Result<Vec<JdkInfo>> {
+        let config_dir = Config::config_dir()?;
+        let managed_dir = config_dir.join("jdks");
+        let mut search_dirs = vec![managed_dir];
+        for dir in &self.config.scan_dirs {
+            let resolved = if dir.is_absolute() { dir.clone() } else { config_dir.join(dir) };
+            if !search_dirs.iter().any(|existing| same_jdk_path(existing, &resolved)) {
+                if !resolved.is_dir() {
+                    eprintln!("Warning: configured scan directory does not exist: {}", resolved.display());
+                    continue;
+                }
+                search_dirs.push(resolved);
             }
         }
-        
-        self.config.save()?; // [注释] 将更新后的配置保存到磁盘
-        Ok(detected) // [注释] 返回检测到的JDK列表
+        let mut detected = Vec::new();
+        for dir in &search_dirs {
+            detected.extend(JdkDetector::scan_directory(dir)?);
+        }
+        if let Some(jdk) = JdkDetector::detect_java_home() {
+            detected.push(jdk);
+        }
+        if scan_system {
+            detected.extend(JdkDetector::detect_system_installations()?);
+        }
+        detected.sort_by(|a, b| a.path.cmp(&b.path));
+        detected.dedup_by(|a, b| same_jdk_path(&a.path, &b.path));
+
+        let mut changed = false;
+        for jdk in &detected {
+            changed |= self.config.register_jdk(jdk.clone())?.1;
+        }
+        if changed { self.config.save()?; }
+        Ok(detected)
     }
 
-    /// Get all registered JDKs
-    pub fn list_jdks(&self) -> Vec<(&String, &JdkInfo)> { // [注释] 公共方法，获取所有已注册JDK的排序列表
-        let mut jdks: Vec<_> = self.config.jdks.iter().collect(); // [注释] 将HashMap的迭代器收集为Vec，包含(版本号, JdkInfo)元组的引用
-        jdks.sort_by(|a, b| { // [注释] 使用自定义比较函数对JDK列表排序
-            // Try to parse as numbers for proper sorting
-            let a_num: std::result::Result<u32, _> = a.0.parse(); // [注释] 尝试将第一个版本号解析为无符号整数
-            let b_num: std::result::Result<u32, _> = b.0.parse(); // [注释] 尝试将第二个版本号解析为无符号整数
-            
-            match (a_num, b_num) { // [注释] 匹配解析结果的组合
-                (Ok(a), Ok(b)) => a.cmp(&b), // [注释] 如果两个都解析成功，按数值比较（如8 < 11 < 17）
-                _ => a.0.cmp(b.0), // [注释] 否则按字符串字典序比较
-            }
+    /// Register the exact directory returned by extraction, even when it is
+    /// deeper than the system scan limit.
+    pub fn register_jdk_path(&mut self, path: &Path) -> Result<String> {
+        if !JdkDetector::is_valid_jdk(path) {
+            return Err(JdkError::InvalidPath(path.display().to_string()));
+        }
+        let info = JdkDetector::get_jdk_info(path)
+            .ok_or_else(|| JdkError::InvalidPath(path.display().to_string()))?;
+        let (key, changed) = self.config.register_jdk(info)?;
+        if changed { self.config.save()?; }
+        Ok(key)
+    }
+
+    pub fn list_jdks(&self) -> Vec<(&String, &JdkInfo)> {
+        let mut jdks: Vec<_> = self.config.jdks.iter().collect();
+        jdks.sort_by(|a, b| {
+            let a_major = a.1.version.parse::<u32>().unwrap_or(0);
+            let b_major = b.1.version.parse::<u32>().unwrap_or(0);
+            a_major.cmp(&b_major).then_with(|| a.0.cmp(b.0))
         });
-        jdks // [注释] 返回排序后的JDK列表
+        jdks
     }
 
-    /// Get current active JDK
-    pub fn get_current(&self) -> Option<&JdkInfo> { // [注释] 公共方法，获取当前激活的JDK信息
-        self.config.get_current() // [注释] 委托给Config的get_current方法，返回Option<&JdkInfo>
-    }
+    pub fn get_current(&self) -> Option<&JdkInfo> { self.config.get_current() }
+    pub fn get_current_version(&self) -> Option<&String> { self.config.current_jdk.as_ref() }
 
-    /// Get current JDK version key
-    pub fn get_current_version(&self) -> Option<&String> { // [注释] 公共方法，获取当前JDK的版本号字符串
-        self.config.current_jdk.as_ref() // [注释] 将Option<String>转换为Option<&String>，返回版本号引用
-    }
-
-    /// Switch to a specific JDK version
-    pub fn switch_jdk(&mut self, version: &str) -> Result<&JdkInfo> { // [注释] 公共方法，切换到指定版本的JDK
-        let jdk = self.config.get_jdk(version) // [注释] 从配置中获取指定版本的JDK信息
-            .ok_or_else(|| JdkError::JdkNotFound(version.to_string()))?; // [注释] 如果找不到，返回JdkNotFound错误
-        
-        // Verify JDK still exists
-        if !JdkDetector::is_valid_jdk(&jdk.path) { // [注释] 验证JDK路径是否仍然有效（文件可能已被删除）
-            return Err(JdkError::InvalidPath(format!( // [注释] 如果路径无效，返回InvalidPath错误
-                "JDK path no longer valid: {}",
-                jdk.path.display() // [注释] 显示无效的JDK路径
-            )));
+    /// Exact IDs always work. A major or full version works when it identifies
+    /// exactly one registered installation.
+    pub fn resolve_jdk(&self, selector: &str) -> Result<(String, JdkInfo)> {
+        if let Some(info) = self.config.jdks.get(selector) {
+            return Self::validate_jdk(selector, info);
         }
-        
-        self.config.set_current(version.to_string()); // [注释] 在配置中设置当前激活的JDK版本
-        self.config.save()?; // [注释] 保存更新后的配置到磁盘
-        
-        Ok(self.config.get_jdk(version).unwrap()) // [泣释] 返回切换后JDK的信息引用，unwrap安全因为前面已验证存在
+        let matches: Vec<_> = self.config.jdks.iter()
+            .filter(|(_, info)| info.version == selector || info.java_version.as_deref() == Some(selector))
+            .collect();
+        match matches.as_slice() {
+            [] => Err(JdkError::JdkNotFound(selector.to_string())),
+            [(key, info)] => Self::validate_jdk(key, info),
+            _ => {
+                let mut ids: Vec<_> = matches.iter().map(|(key, _)| (*key).clone()).collect();
+                ids.sort();
+                Err(JdkError::AmbiguousJdk(selector.to_string(), ids.join(", ")))
+            }
+        }
     }
 
-    /// Save configuration
-    pub fn save(&self) -> Result<()> { // [注释] 公共方法，保存配置到磁盘
-        self.config.save() // [注释] 委托给Config的save方法
+    fn validate_jdk(key: &str, info: &JdkInfo) -> Result<(String, JdkInfo)> {
+        if !JdkDetector::is_valid_jdk(&info.path) {
+            return Err(JdkError::InvalidPath(format!("JDK path no longer valid: {}", info.path.display())));
+        }
+        Ok((key.to_string(), info.clone()))
+    }
+
+    pub fn set_current(&mut self, key: String) -> Result<()> {
+        if !self.config.jdks.contains_key(&key) { return Err(JdkError::JdkNotFound(key)); }
+        self.config.set_current(key);
+        self.config.save()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn fake_jdk(base: &Path, name: &str, full_version: &str) -> JdkInfo {
+        let path = base.join(name);
+        fs::create_dir_all(path.join("bin")).unwrap();
+        fs::create_dir_all(path.join("lib")).unwrap();
+        let executable = if cfg!(windows) { "java.exe" } else { "java" };
+        fs::write(path.join("bin").join(executable), b"").unwrap();
+        JdkInfo {
+            path,
+            version: "17".to_string(),
+            vendor: Some("Eclipse Temurin".to_string()),
+            java_version: Some(full_version.to_string()),
+        }
+    }
+
+    #[test]
+    fn use_requires_id_when_version_is_ambiguous() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut config = Config::default();
+        let (first_id, _) = config.register_jdk(fake_jdk(dir.path(), "one", "17.0.10")).unwrap();
+        let (second_id, _) = config.register_jdk(fake_jdk(dir.path(), "two", "17.0.11")).unwrap();
+        config.register_jdk(fake_jdk(dir.path(), "three", "17.0.10")).unwrap();
+        let manager = JdkManager { config };
+
+        assert!(matches!(manager.resolve_jdk("17"), Err(JdkError::AmbiguousJdk(_, _))));
+        assert!(matches!(manager.resolve_jdk("17.0.10"), Err(JdkError::AmbiguousJdk(_, _))));
+        assert_eq!(manager.resolve_jdk("17.0.11").unwrap().0, second_id);
+        assert_eq!(manager.resolve_jdk(&first_id).unwrap().1.path, dir.path().join("one"));
     }
 }

@@ -12,17 +12,14 @@ impl Extractor {
     /// extract file to target dir
     pub fn extract(&self, archive_path: &Path, target_dir: &Path) -> Result<PathBuf> {
         fs::create_dir_all(target_dir).map_err(|e| JdkError::IoError(e))?;
-        let extension = archive_path
-            .extension()
-            .and_then(|s| s.to_str())
+        let name = archive_path.file_name().and_then(|s| s.to_str())
             .ok_or_else(|| JdkError::ExtractionError("Unknown file type".to_string()))?;
-        match extension {
-            "zip" => self.extract_zip(archive_path, target_dir),
-            "tar" => self.extract_tar_gz(archive_path, target_dir),
-            _ => Err(JdkError::ExtractionError(format!(
-                "Unsupported format: {}",
-                extension
-            ))),
+        if name.ends_with(".zip") {
+            self.extract_zip(archive_path, target_dir)
+        } else if name.ends_with(".tar.gz") {
+            self.extract_tar_gz(archive_path, target_dir)
+        } else {
+            Err(JdkError::ExtractionError(format!("Unsupported archive format: {name}")))
         }
     }
 
@@ -80,7 +77,7 @@ impl Extractor {
         self.find_jdk_root(target_dir)
     }
 
-    fn find_jdk_root(&self, base_dir: &Path) -> Result<PathBuf> {
+    pub fn find_jdk_root(&self, base_dir: &Path) -> Result<PathBuf> {
         use walkdir::WalkDir;
         for entry in WalkDir::new(base_dir).max_depth(3) {
             let entry = entry.map_err(|e| JdkError::IoError(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
@@ -102,6 +99,31 @@ impl Extractor {
     }
 
 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extracts_tar_gz_archive() {
+        let dir = tempfile::tempdir().unwrap();
+        let archive_path = dir.path().join("jdk.tar.gz");
+        let archive_file = fs::File::create(&archive_path).unwrap();
+        let encoder = flate2::write::GzEncoder::new(archive_file, flate2::Compression::default());
+        let mut archive = tar::Builder::new(encoder);
+        let mut header = tar::Header::new_gnu();
+        header.set_size(0);
+        header.set_mode(0o755);
+        header.set_cksum();
+        let java = if cfg!(windows) { "jdk-17/bin/java.exe" } else { "jdk-17/bin/java" };
+        archive.append_data(&mut header, java, &[][..]).unwrap();
+        archive.finish().unwrap();
+        archive.into_inner().unwrap().finish().unwrap();
+
+        let root = Extractor::new().extract(&archive_path, &dir.path().join("out")).unwrap();
+        assert_eq!(root, dir.path().join("out").join("jdk-17"));
+    }
 }
 
 

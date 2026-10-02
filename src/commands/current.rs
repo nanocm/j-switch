@@ -1,4 +1,5 @@
 use crate::error::{JdkError, Result};
+use crate::config::same_jdk_path;
 use crate::jdk::JdkManager;
 use colored::*;
 
@@ -13,7 +14,7 @@ pub fn current_command() -> Result<()> {
         // Find JDK info by path from registered JDKs
         let found = manager.list_jdks()
             .into_iter()
-            .find(|(_, info)| info.path == java_home_path);
+            .find(|(_, info)| same_jdk_path(&info.path, &java_home_path));
         
         if let Some((key, info)) = found {
             (info, key.clone(), "environment variable")
@@ -34,7 +35,8 @@ pub fn current_command() -> Result<()> {
 
     println!("{}", "Current JDK:".bold());
     println!("{}", "=".repeat(60).bright_black());
-    println!("{} {}", "Version:".bright_black(), format!("JDK {}", version_key).green().bold());
+    println!("{} {}", "Version:".bright_black(), format!("JDK {}", current.version).green().bold());
+    println!("{} {}", "ID:".bright_black(), version_key);
     println!("{} {}", "Full Version:".bright_black(),
         current.java_version.as_deref().unwrap_or("unknown"));
 

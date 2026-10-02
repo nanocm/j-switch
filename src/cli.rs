@@ -9,15 +9,19 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// List all installed JDKs
-    List,
+    /// List registered JDKs, managed downloads, configured scan_dirs, and JAVA_HOME
+    List {
+        /// Also scan common system locations (can be slow)
+        #[arg(long)]
+        scan: bool,
+    },
 
     /// Show current active JDK
     Current,
 
     /// Switch to a specific JDK version
     Use {
-        /// Version identifier (e.g., 8, 11, 17, 21)
+        /// Major version, full version, or installation ID from `jsh list`
         version: String,
     },
     

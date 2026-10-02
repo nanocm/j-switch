@@ -12,7 +12,7 @@
 
 ### ✨ 功能特性
 
-- 🔍 **自动检测**：自动扫描并检测常见目录中的 JDK 安装
+- 🔍 **JDK 发现**：`list` 检查已登记的 JDK、下载目录、配置的 `scan_dirs` 和 `JAVA_HOME`；`list --scan` 搜索系统目录
 - 🔄 **快速切换**：一条命令即可切换不同的 JDK 版本
 - ⚙️ **环境管理**：自动更新 `JAVA_HOME` 和 `PATH` 环境变量
 - 📦 **版本管理**：列出、安装和管理多个 JDK 版本
@@ -47,7 +47,7 @@
 > 除下载功能外，其他所有功能（如列出、切换、管理已安装的 JDK）均不受网络影响，可正常使用。
 
 > **JDK路径扫描深度**  
-> jsh扫描的路径深度为 5 层，避免目录过深扫描时间过长，所以请将JDK安装在浅层目录下。  
+> `jsh list --scan` 会搜索常见系统目录（Windows 上为 C: 至 G: 盘根目录），深度最多 5 层，可能需要较长时间。日常使用 `jsh list` 只扫描托管目录和您在 `scan_dirs` 中指定的目录。
 
 > **JDK 下载源说明**  
 > 本工具的 JDK 下载功能使用以下官方源：
@@ -83,6 +83,8 @@ cargo build --release
 jsh list
 ```
 
+首次发现安装在其他位置的 JDK 时，运行 `jsh list --scan`；扫描结果会登记到配置中，后续 `jsh list` 可直接显示。
+
 2. **切换到指定 JDK 版本**：
 ```bash
 jsh use 17
@@ -97,14 +99,17 @@ jsh current
 
 | 命令 | 说明 | 示例 |
 |------|------|------|
-| `jsh list` | 列出所有检测到的 JDK | `jsh list` |
+| `jsh list` | 列出已登记、托管下载、`scan_dirs` 和 `JAVA_HOME` 中的 JDK | `jsh list` |
+| `jsh list --scan` | 扫描常见系统位置并登记找到的 JDK | `jsh list --scan` |
 | `jsh current` | 显示当前激活的 JDK | `jsh current` |
-| `jsh use <版本>` | 切换到指定 JDK 版本 | `jsh use 17` |
-| `jsh download <版本>` | 下载并安装 JDK（即将推出） | `jsh download 21` |
-| `jsh search [版本]` | 搜索可用的 JDK 版本（即将推出） | `jsh search 17` |
+| `jsh use <版本或ID>` | 切换到指定 JDK；版本对应多个安装时需使用 `list` 中的 ID | `jsh use 17` |
+| `jsh download <版本>` | 下载、安装并注册 JDK | `jsh download 21` |
+| `jsh search [版本]` | 搜索可下载的 JDK 版本 | `jsh search 17` |
 | `jsh --help` | 显示帮助信息 | `jsh --help` |
 
 ### 💡 使用示例
+
+下载的 JDK 保存在 `jsh.exe` 所在目录的 `jdks` 子目录，并在下载完成后直接注册。`jsh list` 会显示每个安装的稳定 ID。只有一个 JDK 17 时可用 `jsh use 17`；如果有多个 JDK 17，请复制目标安装的 ID 执行 `jsh use <ID>`。完整版本号（如 `17.0.10`）在唯一匹配时也可使用。旧版 `config.json` 中以主版本号为键的记录会自动迁移。
 
 #### 列出 JDK 安装
 
@@ -116,6 +121,8 @@ $ jsh list
 已安装的 JDK：
 ================================================================================
 * JDK 17 (当前)
+  ID: 17-17.0.10-0123456789abcdef
+  Use: jsh use 17
   版本: 17.0.10
   供应商: OpenJDK
   路径: C:\Program Files\Java\jdk-17
@@ -135,22 +142,24 @@ $ jsh list
 
 #### 切换 JDK 版本
 
+Windows 首次使用时，请以管理员身份运行一次 `jsh use <版本或ID>`。jsh 会在可执行文件旁创建 `jsh-current` 目录联接，并把系统 `JAVA_HOME` 和 `PATH` 指向这个固定入口。随后重新打开终端一次；以后运行 `jsh use` 只切换联接目标，当前终端中的 `java` 命令会立即使用新版本，无需再次以管理员身份运行。
+
 ```bash
 $ jsh use 11
 
-已更新配置:
-  版本: JDK 11
-  路径: C:\Program Files\Java\jdk-11.0.8
+Selected JDK:
+  Version: JDK 11
+  Path: C:\Program Files\Java\jdk-11.0.8
 
-正在更新环境变量...
-[OK] 已设置 JAVA_HOME 为: C:\Program Files\Java\jdk-11.0.8
-[OK] 已更新 PATH，包含: C:\Program Files\Java\jdk-11.0.8\bin
+Activating JDK...
+[OK] System JAVA_HOME now points to: C:\Tools\jsh\jsh-current
+[OK] System PATH now starts with: C:\Tools\jsh\jsh-current\bin
+[OK] Active JDK junction: C:\Tools\jsh\jsh-current -> C:\Program Files\Java\jdk-11.0.8
 
-[OK] 成功切换到 JDK
+[OK] Successfully switched to JDK
 
-注意:
-  环境变量已更新。
-  您可能需要重启终端以使更改生效。
+One-time setup:
+  Reopen this terminal after the stable JDK path is added to JAVA_HOME and PATH.
 ```
 
 #### 查看当前 JDK
@@ -170,26 +179,28 @@ $ jsh current
 
 ### ⚙️ 配置文件
 
-jsh 将配置存储在 `config.json`：
+jsh 将配置存储在可执行文件旁的 `config.json`。在 `scan_dirs` 中填写要自动扫描的目录；每个目录最多向下扫描 5 层。直接填写 JDK 根目录也可以。相对路径以可执行文件所在目录为基准。
 
 配置示例：
 ```json
 {
   "jdks": {
-    "11": {
+    "11-11.0.8-fedcba9876543210": {
       "path": "C:\\Program Files\\Java\\jdk-11.0.8",
       "version": "11",
       "vendor": null,
       "java_version": "11.0.8"
     },
-    "17": {
+    "17-17.0.10-0123456789abcdef": {
       "path": "C:\\Program Files\\Java\\jdk-17",
       "version": "17",
       "vendor": "OpenJDK",
       "java_version": "17.0.10"
     }
   },
-  "current_jdk": "17"
+  "current_jdk": "17-17.0.10-0123456789abcdef",
+  "download_dir": "C:\\path\\to\\jsh\\downloads",
+  "scan_dirs": ["D:\\Java", "E:\\SDKs"]
 }
 ```
 
@@ -210,15 +221,14 @@ $env:Path += ";D:\xx\xx\(jsh.exe)"
 
 如果您的 JDK 未被自动检测：
 
-1. **检查JDK路径深度**：
-   - jsh 只会扫描深度为 5 的目录，避免目录过深扫描时间过长！！
+1. **指定目录或运行完整扫描**：在 `config.json` 的 `scan_dirs` 中填写目录，或运行 `jsh list --scan`。后者在 Windows 上搜索 C: 至 G: 盘根目录，最多 5 层。
 
 
 #### 环境变量未更新（Windows）
 
-1. **切换 JDK 后重启终端**
-2. **检查是否以管理员权限运行**（系统级更改需要）
-3. **手动验证**：`echo %JAVA_HOME%`
+1. **首次配置后重新打开终端一次**；以后切换会在当前终端立即生效。
+2. **首次配置需要管理员权限**，因为需要更新系统级 `JAVA_HOME` 和 `PATH`；后续只切换目录联接。
+3. **手动验证**：`java -version` 和 PowerShell 中的 `$env:JAVA_HOME`。
 
 ### 🤝 贡献指南
 

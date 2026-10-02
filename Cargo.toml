@@ -25,9 +25,12 @@ zip = "6.0.0"
 flate2 = "1.1.5"
 tar = "0.4.44"
 async-trait = "0.1.89"
+sha2 = "0.10"
+tempfile = "3"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
+junction = "2.1"
 windows = { version = "0.52", features = [
     "Win32_Foundation",
     "Win32_System_Registry",

@@ -7,8 +7,9 @@ use walkdir::WalkDir;
 pub struct JdkDetector;
 
 impl JdkDetector {
-    /// Detect all JDK installations on the system
-    pub fn detect_all() -> Result<Vec<JdkInfo>> {
+    /// Scan common system locations. On Windows these include drive roots,
+    /// so callers should make this an explicit operation.
+    pub fn detect_system_installations() -> Result<Vec<JdkInfo>> {
         let mut jdks = Vec::new();
 
         // Check common installation directories
@@ -20,21 +21,21 @@ impl JdkDetector {
             }
         }
         
-        // Check JAVA_HOME
-        if let Ok(java_home) = std::env::var("JAVA_HOME") {
-            let path = PathBuf::from(java_home);
-            if Self::is_valid_jdk(&path) {
-                if let Some(info) = Self::get_jdk_info(&path) {
-                    jdks.push(info);
-                }
-            }
-        }
-        
         // Deduplicate by path
         jdks.sort_by(|a, b| a.path.cmp(&b.path));
         jdks.dedup_by(|a, b| a.path == b.path);
 
         Ok(jdks)
+    }
+
+    pub fn detect_java_home() -> Option<JdkInfo> {
+        if let Ok(java_home) = std::env::var("JAVA_HOME") {
+            let path = PathBuf::from(java_home);
+            if Self::is_valid_jdk(&path) {
+                return Self::get_jdk_info(&path);
+            }
+        }
+        None
     }
     
     /// Get common JDK installation paths based on OS
@@ -67,7 +68,7 @@ impl JdkDetector {
     }
     
     /// Scan a directory for JDK installations
-    fn scan_directory(path: &Path) -> Result<Vec<JdkInfo>> {
+    pub fn scan_directory(path: &Path) -> Result<Vec<JdkInfo>> {
         let mut jdks = Vec::new();
 
         if !path.exists() {
@@ -134,15 +135,29 @@ impl JdkDetector {
             .output()
             .ok()?;
 
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let (version, vendor, java_version) = Self::parse_version_output(&stderr);
+        if !output.status.success() {
+            return None;
+        }
+        let output_text = if output.stderr.is_empty() { &output.stdout } else { &output.stderr };
+        let (version, vendor, java_version) = Self::parse_version_output(&String::from_utf8_lossy(output_text));
+        if version == "unknown" { return None; }
 
         Some(JdkInfo {
-            path: path.to_path_buf(),
+            path: Self::installation_path(path)?,
             version,
             vendor,
             java_version,
         })
+    }
+
+    fn installation_path(path: &Path) -> Option<PathBuf> {
+        #[cfg(target_os = "windows")]
+        {
+            if junction::exists(path).ok()? {
+                return junction::get_target(path).ok();
+            }
+        }
+        Some(path.to_path_buf())
     }
     
     /// Parse java -version output
@@ -175,18 +190,20 @@ impl JdkDetector {
                 }
             }
             
-            // Parse vendor information
-            if line.contains("OpenJDK") {
-                vendor = Some("OpenJDK".to_string());
-            } else if line.contains("Oracle") {
-                vendor = Some("Oracle".to_string());
-            } else if line.contains("Temurin") || line.contains("Eclipse") {
-                vendor = Some("Eclipse Temurin".to_string());
-            } else if line.contains("Zulu") {
-                vendor = Some("Azul Zulu".to_string());
-            } else if line.contains("Microsoft") {
-                vendor = Some("Microsoft".to_string());
-            }
+        }
+
+        // Prefer the specific distribution over generic OpenJDK text, which
+        // appears in the version output of most vendors.
+        if output.contains("Temurin") || output.contains("Eclipse") {
+            vendor = Some("Eclipse Temurin".to_string());
+        } else if output.contains("Zulu") {
+            vendor = Some("Azul Zulu".to_string());
+        } else if output.contains("Microsoft") {
+            vendor = Some("Microsoft".to_string());
+        } else if output.contains("Oracle") || output.contains("Java(TM)") {
+            vendor = Some("Oracle".to_string());
+        } else if output.contains("OpenJDK") || output.contains("openjdk") {
+            vendor = Some("OpenJDK".to_string());
         }
         
         (version, vendor, java_version)
@@ -210,7 +227,21 @@ Java HotSpot(TM) 64-Bit Server VM (build 25.291-b10, mixed mode)"#;
 OpenJDK Runtime Environment Temurin-17.0.2+8 (build 17.0.2+8)
 OpenJDK 64-Bit Server VM Temurin-17.0.2+8 (build 17.0.2+8, mixed mode)"#;
         
-        let (version, _, _) = JdkDetector::parse_version_output(output2);
+        let (version, vendor, _) = JdkDetector::parse_version_output(output2);
         assert_eq!(version, "17");
+        assert_eq!(vendor.as_deref(), Some("Eclipse Temurin"));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn jsh_junction_registers_its_real_target() {
+        let temp = tempfile::tempdir().unwrap();
+        let target = temp.path().join("jdk");
+        std::fs::create_dir(&target).unwrap();
+        let link = temp.path().join("jsh-current");
+        junction::create(&target, &link).unwrap();
+        assert!(crate::config::same_jdk_path(
+            &JdkDetector::installation_path(&link).unwrap(), &target
+        ));
     }
 }

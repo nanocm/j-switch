@@ -40,8 +40,8 @@ fn supports_color() -> bool {
 async fn run() -> error::Result<()> {
     let cli = Cli::parse();
     match cli.command {
-        Commands::List => {
-            commands::list_command()?;
+        Commands::List { scan } => {
+            commands::list_command(scan)?;
         }
         Commands::Current => {
             commands::current_command()?;

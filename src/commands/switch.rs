@@ -8,25 +8,30 @@ pub fn use_command(version: &str) -> Result<()> {
 
     println!("{}", format!("Switching to JDK {}...", version).cyan());
 
-    let jdk = manager.switch_jdk(version)?;
+    let (key, jdk) = manager.resolve_jdk(version)?;
 
-    println!("\n{}", "Updated configuration:".bold());
-    println!("  {} JDK {}", "Version:".bright_black(), version.green());
+    println!("\n{}", "Selected JDK:".bold());
+    println!("  {} JDK {}", "Version:".bright_black(), jdk.version.green());
+    println!("  {} {}", "ID:".bright_black(), key);
     println!("  {} {}", "Path:".bright_black(), jdk.path.display());
 
     // Update environment variables
-    println!("\n{}", "Updating environment variables...".cyan());
+    println!("\n{}", "Activating JDK...".cyan());
     let env_updater = get_env_updater();
     env_updater.update_java_home(&jdk.path)?;
+    manager.set_current(key)?;
 
     println!("\n{} {}", "[OK]".green().bold(), "Successfully switched to JDK".green());
 
     #[cfg(target_os = "windows")]
     {
-        println!("\n{}", "Note:".yellow().bold());
-        println!("  System environment variables have been updated (need administrator permission).");
-        println!("  You need to restart your terminal or IDE for changes to take effect.");
-        println!("  If you see permission errors, please run this tool as Administrator.");
+        if env_updater.shell_uses_link()? {
+            println!("  This terminal already uses the stable JDK path; java commands switch immediately.");
+        } else {
+            println!("\n{}", "One-time setup:".yellow().bold());
+            println!("  Reopen this terminal after the stable JDK path is added to JAVA_HOME and PATH.");
+            println!("  Future jsh use commands will then affect an open terminal immediately.");
+        }
     }
 
     #[cfg(not(target_os = "windows"))]

@@ -5,6 +5,9 @@ pub enum JdkError {
     #[error("JDK version {0} not found")]
     JdkNotFound(String),
 
+    #[error("JDK {0} matches multiple installations. Use one of these IDs: {1}")]
+    AmbiguousJdk(String, String),
+
     #[error("Invalid JDK path: {0}")]
     InvalidPath(String),
 

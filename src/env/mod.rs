@@ -6,11 +6,9 @@ pub mod unix;
 
 use crate::error::Result;
 use std::path::Path;
-use winreg::RegKey;
 
 pub trait EnvUpdater {
     fn update_java_home(&self, path: &Path) -> Result<()>;
-    fn update_path_with_key(&self, env_key: &RegKey, java_home: &Path) -> Result<()>;
 }
 
 #[cfg(target_os = "windows")]
