@@ -4,10 +4,10 @@ use crate::error::{JdkError, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
-use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_READ, KEY_WRITE, REG_EXPAND_SZ, REG_SZ};
+use winreg::enums::{HKEY_CURRENT_USER, REG_EXPAND_SZ, REG_SZ};
 use winreg::{RegKey, RegValue};
 
-const ENVIRONMENT_KEY: &str = "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment";
+const ENVIRONMENT_KEY: &str = "Environment";
 
 pub struct WindowsEnvUpdater;
 
@@ -43,11 +43,12 @@ impl WindowsEnvUpdater {
         Ok(())
     }
 
-    fn environment_key(access: u32) -> Result<RegKey> {
-        RegKey::predef(HKEY_LOCAL_MACHINE)
-            .open_subkey_with_flags(ENVIRONMENT_KEY, access)
+    fn environment_key() -> Result<RegKey> {
+        RegKey::predef(HKEY_CURRENT_USER)
+            .create_subkey(ENVIRONMENT_KEY)
+            .map(|(key, _)| key)
             .map_err(|e| JdkError::EnvError(format!(
-                "Cannot access system environment registry key: {e}. Run jsh use once as Administrator to set up immediate switching."
+                "Cannot access user environment registry key: {e}"
             )))
     }
 
@@ -61,8 +62,7 @@ impl WindowsEnvUpdater {
 
     fn registry_ready(key: &RegKey, link: &Path) -> Result<bool> {
         let home: String = key.get_value("JAVA_HOME").unwrap_or_default();
-        let path: String = key.get_value("Path")
-            .map_err(|e| JdkError::EnvError(format!("Cannot read system PATH: {e}")))?;
+        let path: String = key.get_value("Path").unwrap_or_default();
         let first_path = path.split(';').find(|entry| !entry.trim().is_empty());
         Ok(Self::same_env_path(&home, &link.to_string_lossy())
             && first_path.is_some_and(|entry| Self::same_env_path(entry, &link.join("bin").to_string_lossy())))
@@ -91,32 +91,40 @@ impl WindowsEnvUpdater {
     }
 
     fn install_registry(key: &RegKey, link: &Path) -> Result<()> {
-        let old_path_raw = key.get_raw_value("Path")
-            .map_err(|e| JdkError::EnvError(format!("Cannot read system PATH: {e}")))?;
-        if old_path_raw.vtype != REG_SZ && old_path_raw.vtype != REG_EXPAND_SZ {
-            return Err(JdkError::EnvError("System PATH is not a string registry value".to_string()));
+        let old_path_raw = match key.get_raw_value("Path") {
+            Ok(value) => Some(value),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => return Err(JdkError::EnvError(format!("Cannot read user PATH: {error}"))),
+        };
+        if old_path_raw.as_ref().is_some_and(|value| value.vtype != REG_SZ && value.vtype != REG_EXPAND_SZ) {
+            return Err(JdkError::EnvError("User PATH is not a string registry value".to_string()));
         }
-        let old_path: String = key.get_value("Path")
-            .map_err(|e| JdkError::EnvError(format!("Cannot read system PATH: {e}")))?;
+        let old_path: String = if old_path_raw.is_some() {
+            key.get_value("Path").map_err(|e| JdkError::EnvError(format!("Cannot read user PATH: {e}")))?
+        } else { String::new() };
         let previous_home: String = key.get_value("JAVA_HOME").unwrap_or_default();
         let new_path = Self::updated_path(&old_path, &previous_home, link);
         let new_path_raw = RegValue {
             bytes: Self::wide_bytes(&new_path),
-            vtype: old_path_raw.vtype.clone(),
+            vtype: old_path_raw.as_ref().map(|value| value.vtype.clone()).unwrap_or(REG_EXPAND_SZ),
         };
         key.set_raw_value("Path", &new_path_raw)
-            .map_err(|e| JdkError::EnvError(format!("Cannot update system PATH: {e}")))?;
+            .map_err(|e| JdkError::EnvError(format!("Cannot update user PATH: {e}")))?;
 
         if let Err(e) = key.set_value("JAVA_HOME", &link.to_string_lossy().into_owned()) {
-            let rollback = key.set_raw_value("Path", &old_path_raw);
+            let rollback = if let Some(old) = &old_path_raw {
+                key.set_raw_value("Path", old)
+            } else {
+                key.delete_value("Path")
+            };
             let detail = match rollback {
-                Ok(()) => format!("Cannot update system JAVA_HOME: {e}"),
-                Err(restore) => format!("Cannot update system JAVA_HOME: {e}; PATH restore also failed: {restore}"),
+                Ok(()) => format!("Cannot update user JAVA_HOME: {e}"),
+                Err(restore) => format!("Cannot update user JAVA_HOME: {e}; PATH restore also failed: {restore}"),
             };
             return Err(JdkError::EnvError(detail));
         }
-        println!("[OK] System JAVA_HOME now points to: {}", link.display());
-        println!("[OK] System PATH now starts with: {}", link.join("bin").display());
+        println!("[OK] User JAVA_HOME now points to: {}", link.display());
+        println!("[OK] User PATH now starts with: {}", link.join("bin").display());
         Ok(())
     }
 
@@ -220,16 +228,12 @@ impl EnvUpdater for WindowsEnvUpdater {
     fn update_java_home(&self, path: &Path) -> Result<()> {
         let link = Self::link_path()?;
         Self::ensure_switchable_location(&link)?;
-        let read_key = Self::environment_key(KEY_READ)?;
-        let needs_setup = !Self::registry_ready(&read_key, &link)?;
-        // Check write access before touching the junction on first setup.
-        let write_key = if needs_setup {
-            Some(Self::environment_key(KEY_READ | KEY_WRITE)?)
-        } else {
-            None
-        };
+        // Opening the user key for writing before the junction change makes a
+        // permission failure leave the selected JDK untouched.
+        let key = Self::environment_key()?;
+        let needs_setup = !Self::registry_ready(&key, &link)?;
         let old_target = Self::switch_junction(&link, path)?;
-        if let Some(key) = write_key {
+        if needs_setup {
             if let Err(e) = Self::install_registry(&key, &link) {
                 if let Err(restore) = Self::restore_junction(&link, old_target.as_deref()) {
                     return Err(JdkError::EnvError(format!("{e}; junction restore also failed: {restore}")));
@@ -247,7 +251,6 @@ impl EnvUpdater for WindowsEnvUpdater {
 mod tests {
     use super::*;
     use std::process::Command;
-    use winreg::enums::HKEY_CURRENT_USER;
 
     #[test]
     fn first_setup_updates_registry_values_without_touching_real_environment() {
@@ -262,6 +265,19 @@ mod tests {
         assert!(WindowsEnvUpdater::registry_ready(&key, link).unwrap());
         assert_eq!(key.get_value::<String, _>("Path").unwrap(),
             "C:\\jsh\\jsh-current\\bin;C:\\Tools\\bin");
+        drop(key);
+        root.delete_subkey(&name).unwrap();
+    }
+
+    #[test]
+    fn first_setup_creates_a_missing_user_path() {
+        let name = format!("Software\\j-switch-empty-test-{}", std::process::id());
+        let root = RegKey::predef(HKEY_CURRENT_USER);
+        let (key, _) = root.create_subkey(&name).unwrap();
+        let link = Path::new("C:\\jsh\\jsh-current");
+        WindowsEnvUpdater::install_registry(&key, link).unwrap();
+        assert_eq!(key.get_value::<String, _>("Path").unwrap(), "C:\\jsh\\jsh-current\\bin");
+        assert_eq!(key.get_value::<String, _>("JAVA_HOME").unwrap(), "C:\\jsh\\jsh-current");
         drop(key);
         root.delete_subkey(&name).unwrap();
     }

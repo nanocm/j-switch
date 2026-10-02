@@ -6,7 +6,7 @@ A small JDK manager for Windows, macOS, and Linux. This repository is a [fork of
 
 ## Install
 
-Download a binary from [Releases](https://github.com/nanocm/j-switch/releases), or build from source with Rust 1.85 or newer (the project uses Rust edition 2024):
+Download a binary from [Releases](https://github.com/nanocm/j-switch/releases), or build from source with Rust 1.88 or newer (the locked dependencies require it):
 
 ```sh
 cargo build --release --locked
@@ -44,11 +44,11 @@ Downloads are checked against the size and SHA-256 provided by Adoptium. Verifie
 
 ### Windows
 
-The first `jsh use <version-or-ID>` needs an Administrator terminal to configure the **system** `JAVA_HOME` and `PATH`. `jsh` creates a `jsh-current` directory junction beside the executable and puts `jsh-current\bin` first in the system `PATH`. Reopen the terminal once to inherit those values.
+The first `jsh use <version-or-ID>` configures your **user** `JAVA_HOME` and `PATH`; Administrator rights are not needed. `jsh` creates a `jsh-current` directory junction beside the executable and adds `jsh-current\bin` to the beginning of your user `PATH`. Reopen the terminal once to inherit those values.
 
-Later `jsh use` commands only retarget the junction. A terminal that already uses `jsh-current` for `JAVA_HOME` and resolves `java` from `jsh-current\bin` sees the new JDK immediately. `jsh current` warns when another Java installation precedes it on `PATH`. The `jsh.exe` directory must remain writable by your normal account for later switches.
+Later `jsh use` commands only retarget the junction. A terminal that already uses `jsh-current` for `JAVA_HOME` and resolves `java` from `jsh-current\bin` sees the new JDK immediately. Windows can place system `PATH` entries before user entries; if another Java installation comes first, `jsh current` reports its location so you can adjust that entry. The `jsh.exe` directory must remain writable by your normal account for later switches.
 
-This setup changes the system Java selection for other terminals and users too. Keep the installation directory under your control and do not grant other users write access to it.
+The setting applies to your Windows account. Keep the installation directory under your control and do not grant other users write access to it.
 
 ### macOS and Linux
 

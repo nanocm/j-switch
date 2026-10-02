@@ -2,6 +2,7 @@
 name = "j-switch"
 version = "0.2.0"
 edition = "2024"
+rust-version = "1.88"
 authors = ["YiTouch contributors", "nanocm"]
 description = "A command-line tool to manage and switch between multiple JDK installations"
 license = "MIT"

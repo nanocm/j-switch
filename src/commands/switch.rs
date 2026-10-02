@@ -37,7 +37,8 @@ pub fn use_command(version: &str) -> Result<()> {
             println!("  This terminal already uses the stable JDK path; java commands switch immediately.");
         } else {
             println!("\n{}", "One-time setup:".yellow().bold());
-            println!("  Reopen this terminal after the stable JDK path is added to JAVA_HOME and PATH.");
+            println!("  Reopen this terminal after the stable JDK path is added to your JAVA_HOME and PATH.");
+            println!("  If another Java appears earlier on PATH, move or remove that entry.");
             println!("  Future jsh use commands will then affect an open terminal immediately.");
         }
     }

@@ -6,7 +6,7 @@
 
 ## 安装
 
-可从 [Releases](https://github.com/nanocm/j-switch/releases) 下载二进制文件，或使用 Rust 1.85 及以上版本从源码编译（项目采用 Rust 2024 edition）：
+可从 [Releases](https://github.com/nanocm/j-switch/releases) 下载二进制文件，或使用 Rust 1.88 及以上版本从源码编译（锁定的依赖需要此版本）：
 
 ```sh
 cargo build --release --locked
@@ -44,11 +44,11 @@ jsh current
 
 ### Windows
 
-首次运行 `jsh use <版本或ID>` 时，需要使用管理员终端设置**系统级** `JAVA_HOME` 和 `PATH`。`jsh` 会在可执行文件旁建立 `jsh-current` 目录联接，并把 `jsh-current\bin` 放在系统 `PATH` 的最前面。首次配置后重新打开一次终端，让终端继承这些环境变量。
+首次运行 `jsh use <版本或ID>` 时，`jsh` 会设置**当前用户的** `JAVA_HOME` 和 `PATH`，不需要管理员权限。它会在可执行文件旁建立 `jsh-current` 目录联接，并把 `jsh-current\bin` 加到用户 `PATH` 的最前面。首次配置后重新打开一次终端，让终端继承这些环境变量。
 
-以后运行 `jsh use` 只需切换目录联接目标。只要当前终端的 `JAVA_HOME` 指向 `jsh-current`，且 `java` 首先从 `jsh-current\bin` 找到，新版本会立即生效。若其他 Java 路径排在前面，`jsh current` 会提醒你。后续切换要求普通用户能够写入 `jsh.exe` 所在目录。
+以后运行 `jsh use` 只需切换目录联接目标。只要当前终端的 `JAVA_HOME` 指向 `jsh-current`，且 `java` 首先从 `jsh-current\bin` 找到，新版本会立即生效。Windows 可能把系统 `PATH` 排在用户 `PATH` 前面；若其他 Java 路径因此排在前面，`jsh current` 会显示该路径，便于你调整。后续切换要求普通用户能够写入 `jsh.exe` 所在目录。
 
-这项首次配置会改变其他终端和用户看到的系统 Java 版本。请将安装目录保存在自己可控制的位置，不要向其他用户开放写权限。
+这项配置只对当前 Windows 账户生效。请将安装目录保存在自己可控制的位置，不要向其他用户开放写权限。
 
 ### macOS 和 Linux
 

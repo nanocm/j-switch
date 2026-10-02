@@ -10,10 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install Rust 1.85
-        run: rustup toolchain install 1.85.0 --profile minimal
+      - name: Install Rust 1.88
+        run: rustup toolchain install 1.88.0 --profile minimal
       - name: Test minimum Rust version
-        run: cargo +1.85.0 test --locked
+        run: cargo +1.88.0 test --locked
 
   test:
     strategy:
