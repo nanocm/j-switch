@@ -1,8 +1,12 @@
 # j-switch (`jsh`)
 
-A small JDK manager for Windows, macOS, and Linux. This repository is a [fork of YiTouch/j-switch](https://github.com/YiTouch/j-switch).
+A JDK manager with builds for Windows, macOS, and Linux. This repository is a [fork of YiTouch/j-switch](https://github.com/YiTouch/j-switch).
 
 `jsh` discovers existing JDKs, downloads Eclipse Temurin JDKs, keeps installations with the same version separate, and switches the active JDK.
+
+## Validation status
+
+Windows operation has been confirmed by the repository owner. For Linux and macOS, CI has compiled and run unit tests on hosted runners (including a shell test with simulated Java executables), and the release archives have passed checksum and architecture checks. At the v0.2.0 release, a full `jsh download` → `jsh list` → `jsh use` run with a real JDK had not been verified on Linux or macOS. These builds should be treated as needing real-world validation.
 
 ## Install
 

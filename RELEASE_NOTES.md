@@ -2,6 +2,10 @@
 
 This release makes downloaded JDKs visible immediately, keeps installations with the same major version distinct, and switches Java in an already configured terminal through a stable junction or symbolic link.
 
+## Validation scope
+
+The repository owner has confirmed Windows operation. Linux and macOS builds passed hosted CI compilation and unit tests, including a shell-switching test with simulated Java executables. The four release archives passed checksum and architecture checks. A complete real-JDK download, list, and use flow on Linux or macOS had not been verified when v0.2.0 was published; those builds still need real-world validation.
+
 ## Changes
 
 - `jsh list` checks registered JDKs, managed installs, `JAVA_HOME`, and configured `scan_dirs`. Use `jsh list --scan` for a broader system search or `jsh list --prune` to remove unavailable registrations.

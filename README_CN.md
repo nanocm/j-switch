@@ -1,8 +1,12 @@
 # j-switch (`jsh`)
 
-适用于 Windows、macOS 和 Linux 的 JDK 管理工具。本仓库基于 [YiTouch/j-switch](https://github.com/YiTouch/j-switch) fork。
+提供 Windows、macOS 和 Linux 构建产物的 JDK 管理工具。本仓库基于 [YiTouch/j-switch](https://github.com/YiTouch/j-switch) fork。
 
 `jsh` 可以发现本机 JDK、下载 Eclipse Temurin JDK、分别保存相同版本的安装，并切换当前使用的 JDK。
+
+## 验证范围
+
+仓库所有者已确认 Windows 可用。Linux 和 macOS 在 GitHub 托管运行器上通过了编译、单元测试（包括使用模拟 Java 可执行文件的 shell 切换测试）；发布包的校验值和架构也已核对。但在 v0.2.0 发布时，尚未在 Linux 或 macOS 上用真实 JDK 完整验证 `jsh download` → `jsh list` → `jsh use`。这些平台的构建产物仍需实际使用验证。
 
 ## 安装
 
