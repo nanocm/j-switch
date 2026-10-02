@@ -65,6 +65,7 @@ impl AdoptiumSource {
 
         Ok(JdkPackage {
             version: asset.version.semver.clone(),
+            runtime_version: asset.version.openjdk_version,
             major_version: asset.version.major,
             vendor: "temurin".to_string(),
             os: asset.binary.os.clone(),
@@ -93,6 +94,8 @@ struct AssetResponse {
 #[derive(Deserialize, Debug)]
 struct Version {
     major: u32,
+    #[serde(default)]
+    openjdk_version: Option<String>,
     // minor: u32,
     // security: u32,
     // build: u32,

@@ -126,7 +126,8 @@ fn verify_installed_jdk(path: &Path, package: &JdkPackage) -> Result<()> {
 }
 
 fn expected_java_version(package: &JdkPackage) -> String {
-    let version = package.version.split('+').next().unwrap_or(&package.version);
+    let reported = package.runtime_version.as_deref().unwrap_or(&package.version);
+    let version = reported.split(['+', '-']).next().unwrap_or(reported);
     if package.major_version == 8 {
         if let Some(update) = version.strip_prefix("8.0.") {
             return format!("1.8.0_{update}");
@@ -143,6 +144,7 @@ mod tests {
     fn temurin_semver_matches_java_version_output() {
         let mut package = JdkPackage {
             version: "8.0.504+1".to_string(), major_version: 8,
+            runtime_version: Some("1.8.0_504-b01".to_string()),
             vendor: "temurin".to_string(), os: "windows".to_string(),
             arch: "x64".to_string(), download_url: String::new(),
             size: 0, file_type: "zip".to_string(), is_lts: true,
@@ -150,7 +152,8 @@ mod tests {
         };
         assert_eq!(expected_java_version(&package), "1.8.0_504");
         package.version = "21.0.12+101.0.LTS".to_string();
+        package.runtime_version = Some("21.0.12.1+1-LTS".to_string());
         package.major_version = 21;
-        assert_eq!(expected_java_version(&package), "21.0.12");
+        assert_eq!(expected_java_version(&package), "21.0.12.1");
     }
 }

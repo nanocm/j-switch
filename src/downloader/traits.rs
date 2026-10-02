@@ -58,6 +58,10 @@ pub struct JdkPackage {
     /// version（eg: "17.0.9+9"）
     pub version: String,
 
+    /// Version string reported by `java -version` before its build suffix.
+    #[serde(default)]
+    pub runtime_version: Option<String>,
+
     /// major version（eg: 17）
     pub major_version: u32,
 
