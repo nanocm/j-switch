@@ -32,9 +32,3 @@ jobs:
         run: cargo test --locked
       - name: Build
         run: cargo build --release --locked
-      - name: Build both macOS architectures
-        if: matrix.os == 'macos-15-intel'
-        run: |
-          rustup target add aarch64-apple-darwin x86_64-apple-darwin
-          cargo build --release --locked --target aarch64-apple-darwin
-          cargo build --release --locked --target x86_64-apple-darwin
