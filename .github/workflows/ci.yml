@@ -19,12 +19,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-15, macos-26-arm64]
+        os: [windows-latest, ubuntu-latest, macos-15, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust
         run: rustup update stable
+      - name: Confirm ARM64 runner
+        if: matrix.os == 'macos-latest'
+        run: test "$(uname -m)" = arm64
       - name: Test
         run: cargo test --locked
       - name: Build
