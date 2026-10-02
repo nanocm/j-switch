@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-15, macos-15-arm64]
+        os: [windows-latest, ubuntu-latest, macos-15, macos-26-arm64]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -30,7 +30,7 @@ jobs:
       - name: Build
         run: cargo build --release --locked
       - name: Build both macOS architectures
-        if: matrix.os == 'macos-15-arm64'
+        if: matrix.os == 'macos-15'
         run: |
           rustup target add aarch64-apple-darwin x86_64-apple-darwin
           cargo build --release --locked --target aarch64-apple-darwin
