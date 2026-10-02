@@ -1,4 +1,5 @@
 use crate::error::{JdkError, Result};
+use crate::jdk::detector::JdkDetector;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -83,15 +84,8 @@ impl Extractor {
             let entry = entry.map_err(|e| JdkError::IoError(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
             let path = entry.path();
 
-            if path.is_dir() {
-                let java_exe = if cfg!(target_os = "windows") {
-                    path.join("bin").join("java.exe")
-                } else {
-                    path.join("bin").join("java")
-                };
-                if java_exe.is_file() {
-                    return Ok(path.to_path_buf());
-                }
+            if JdkDetector::is_valid_jdk(path) {
+                return Ok(path.to_path_buf());
             }
 
         }
@@ -118,6 +112,14 @@ mod tests {
         header.set_cksum();
         let java = if cfg!(windows) { "jdk-17/bin/java.exe" } else { "jdk-17/bin/java" };
         archive.append_data(&mut header, java, &[][..]).unwrap();
+        let javac = if cfg!(windows) { "jdk-17/bin/javac.exe" } else { "jdk-17/bin/javac" };
+        archive.append_data(&mut header, javac, &[][..]).unwrap();
+        let mut lib_header = tar::Header::new_gnu();
+        lib_header.set_entry_type(tar::EntryType::Directory);
+        lib_header.set_size(0);
+        lib_header.set_mode(0o755);
+        lib_header.set_cksum();
+        archive.append_data(&mut lib_header, "jdk-17/lib/", &[][..]).unwrap();
         archive.finish().unwrap();
         archive.into_inner().unwrap().finish().unwrap();
 

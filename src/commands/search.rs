@@ -7,7 +7,7 @@ use std::collections::HashMap;
 pub async fn search_command(keyword: Option<String>) -> Result<()> {
     println!("{}", "Searching for available JDK versions...".cyan());
 
-    let source = AdoptiumSource::new();
+    let source = AdoptiumSource::new()?;
     let mut packages = source.fetch_version().await?;
 
     println!(

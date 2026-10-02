@@ -15,7 +15,8 @@ pub struct Downloader {
 
 impl Downloader {
     pub fn new() -> Result<Self> {
-        let download_dir = Config::config_dir()?.join("downloads");
+        let config = Config::load()?;
+        let download_dir = Self::resolve_download_dir(&Config::config_dir()?, &config.download_dir)?;
         std::fs::create_dir_all(&download_dir)?;
         Ok(Self {
             client: Client::builder()
@@ -24,6 +25,13 @@ impl Downloader {
                 .map_err(|e| JdkError::DownloadError(e.to_string()))?,
             download_dir,
         })
+    }
+
+    fn resolve_download_dir(config_dir: &Path, configured: &Path) -> Result<PathBuf> {
+        if configured.as_os_str().is_empty() {
+            return Err(JdkError::ConfigError("download_dir cannot be empty".to_string()));
+        }
+        Ok(if configured.is_absolute() { configured.to_path_buf() } else { config_dir.join(configured) })
     }
 
     pub async fn download_file<F>(
@@ -50,7 +58,8 @@ impl Downloader {
             .map_err(|e| JdkError::NetworkError(e.to_string()))?
             .error_for_status()
             .map_err(|e| JdkError::NetworkError(e.to_string()))?;
-        let part_path = self.download_dir.join(format!("{filename}.part"));
+        let part_path = tempfile::Builder::new().prefix(".jsh-download-")
+            .suffix(".part").tempfile_in(&self.download_dir)?.into_temp_path();
         let mut file = File::create(&part_path).await?;
         let mut downloaded = 0_u64;
         let mut hasher = Sha256::new();
@@ -61,13 +70,11 @@ impl Downloader {
                 Ok(chunk) => chunk,
                 Err(e) => {
                     drop(file);
-                    let _ = tokio::fs::remove_file(&part_path).await;
                     return Err(JdkError::NetworkError(e.to_string()));
                 }
             };
             if let Err(e) = file.write_all(&chunk).await {
                 drop(file);
-                let _ = tokio::fs::remove_file(&part_path).await;
                 return Err(JdkError::IoError(e));
             }
             hasher.update(&chunk);
@@ -79,13 +86,19 @@ impl Downloader {
 
         let actual_checksum = format!("{:x}", hasher.finalize());
         if downloaded != expected_size || checksum.is_some_and(|value| !actual_checksum.eq_ignore_ascii_case(value)) {
-            let _ = tokio::fs::remove_file(&part_path).await;
             return Err(JdkError::DownloadError(format!(
                 "Downloaded archive failed size or SHA-256 verification: {}", target_path.display()
             )));
         }
-        if target_path.exists() { tokio::fs::remove_file(&target_path).await?; }
-        tokio::fs::rename(&part_path, &target_path).await?;
+        if Self::verify_file(&target_path, expected_size, checksum)? {
+            return Ok(target_path);
+        }
+        if let Err(error) = part_path.persist(&target_path) {
+            if Self::verify_file(&target_path, expected_size, checksum)? {
+                return Ok(target_path);
+            }
+            return Err(JdkError::DownloadError(format!("Cannot save verified archive: {error}")));
+        }
         Ok(target_path)
     }
 
@@ -118,5 +131,12 @@ mod tests {
         assert!(Downloader::verify_file(&archive, 3, Some(checksum)).unwrap());
         assert!(!Downloader::verify_file(&archive, 4, Some(checksum)).unwrap());
         assert!(!Downloader::verify_file(&archive, 3, Some(&"0".repeat(64))).unwrap());
+    }
+
+    #[test]
+    fn configured_download_directory_resolves_relative_to_config() {
+        let base = Path::new("C:/jsh");
+        assert_eq!(Downloader::resolve_download_dir(base, Path::new("cache")).unwrap(), base.join("cache"));
+        assert!(Downloader::resolve_download_dir(base, Path::new("")).is_err());
     }
 }

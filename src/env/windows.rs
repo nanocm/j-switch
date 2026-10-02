@@ -18,6 +18,31 @@ impl WindowsEnvUpdater {
         Ok(Config::config_dir()?.join("jsh-current"))
     }
 
+    fn ensure_switchable_location(link: &Path) -> Result<()> {
+        let directory = link.parent().ok_or_else(|| JdkError::EnvError(
+            "JDK junction has no parent directory".to_string()
+        ))?;
+        let location = directory.to_string_lossy().replace('/', "\\").to_lowercase();
+        for variable in ["ProgramFiles", "ProgramFiles(x86)", "SystemRoot"] {
+            if let Some(root) = std::env::var_os(variable) {
+                let root = root.to_string_lossy().trim_end_matches(['\\', '/'])
+                    .replace('/', "\\").to_lowercase();
+                if location == root || location.starts_with(&(root + "\\")) {
+                    return Err(JdkError::EnvError(format!(
+                        "Install jsh in a directory writable without Administrator rights; {} is protected",
+                        directory.display()
+                    )));
+                }
+            }
+        }
+        tempfile::Builder::new().prefix(".jsh-write-check-")
+            .tempfile_in(directory)
+            .map_err(|e| JdkError::EnvError(format!(
+                "JDK switch directory {} is not writable: {e}", directory.display()
+            )))?;
+        Ok(())
+    }
+
     fn environment_key(access: u32) -> Result<RegKey> {
         RegKey::predef(HKEY_LOCAL_MACHINE)
             .open_subkey_with_flags(ENVIRONMENT_KEY, access)
@@ -90,7 +115,6 @@ impl WindowsEnvUpdater {
             };
             return Err(JdkError::EnvError(detail));
         }
-        Self::broadcast_environment_change();
         println!("[OK] System JAVA_HOME now points to: {}", link.display());
         println!("[OK] System PATH now starts with: {}", link.join("bin").display());
         Ok(())
@@ -195,6 +219,7 @@ impl WindowsEnvUpdater {
 impl EnvUpdater for WindowsEnvUpdater {
     fn update_java_home(&self, path: &Path) -> Result<()> {
         let link = Self::link_path()?;
+        Self::ensure_switchable_location(&link)?;
         let read_key = Self::environment_key(KEY_READ)?;
         let needs_setup = !Self::registry_ready(&read_key, &link)?;
         // Check write access before touching the junction on first setup.
@@ -211,6 +236,7 @@ impl EnvUpdater for WindowsEnvUpdater {
                 }
                 return Err(e);
             }
+            Self::broadcast_environment_change();
         }
         println!("[OK] Active JDK junction: {} -> {}", link.display(), path.display());
         Ok(())
@@ -221,6 +247,24 @@ impl EnvUpdater for WindowsEnvUpdater {
 mod tests {
     use super::*;
     use std::process::Command;
+    use winreg::enums::HKEY_CURRENT_USER;
+
+    #[test]
+    fn first_setup_updates_registry_values_without_touching_real_environment() {
+        let name = format!("Software\\j-switch-test-{}", std::process::id());
+        let root = RegKey::predef(HKEY_CURRENT_USER);
+        let (key, _) = root.create_subkey(&name).unwrap();
+        key.set_value("Path", &"C:\\Tools\\bin;C:\\Java\\old\\bin").unwrap();
+        key.set_value("JAVA_HOME", &"C:\\Java\\old").unwrap();
+        let link = Path::new("C:\\jsh\\jsh-current");
+        assert!(!WindowsEnvUpdater::registry_ready(&key, link).unwrap());
+        WindowsEnvUpdater::install_registry(&key, link).unwrap();
+        assert!(WindowsEnvUpdater::registry_ready(&key, link).unwrap());
+        assert_eq!(key.get_value::<String, _>("Path").unwrap(),
+            "C:\\jsh\\jsh-current\\bin;C:\\Tools\\bin");
+        drop(key);
+        root.delete_subkey(&name).unwrap();
+    }
 
     #[test]
     fn path_setup_preserves_unrelated_entries() {

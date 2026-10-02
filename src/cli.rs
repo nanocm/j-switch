@@ -14,6 +14,9 @@ pub enum Commands {
         /// Also scan common system locations (can be slow)
         #[arg(long)]
         scan: bool,
+        /// Remove registered JDKs whose paths are no longer valid
+        #[arg(long)]
+        prune: bool,
     },
 
     /// Show current active JDK

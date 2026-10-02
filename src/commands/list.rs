@@ -4,7 +4,7 @@ use crate::jdk::JdkManager;
 use colored::*;
 use std::collections::HashMap;
 
-pub fn list_command(scan_system: bool) -> Result<()> {
+pub fn list_command(scan_system: bool, prune: bool) -> Result<()> {
     let mut manager = JdkManager::new()?;
 
     if scan_system {
@@ -13,9 +13,14 @@ pub fn list_command(scan_system: bool) -> Result<()> {
         println!("{}", "Checking registered JDKs, managed downloads, configured directories, and JAVA_HOME...".cyan());
     }
     manager.scan_jdks(scan_system)?;
+    if prune {
+        let removed = manager.prune_unavailable()?;
+        println!("Removed {removed} unavailable JDK registration(s).");
+    }
     let java_home_path = std::env::var("JAVA_HOME").ok().map(|s| std::path::PathBuf::from(s));
 
     let jdks = manager.list_jdks();
+    let unavailable = manager.unavailable_jdks();
     let current_version = manager.get_current_version();
     let mut major_counts = HashMap::new();
     for (_, info) in &jdks {
@@ -23,7 +28,8 @@ pub fn list_command(scan_system: bool) -> Result<()> {
     }
     
     if jdks.is_empty() {
-        println!("{}", "No JDK installations found.".yellow());
+        println!("{}", "No available JDK installations found.".yellow());
+        print_unavailable(&unavailable);
         if !scan_system {
             println!("Add scan_dirs to config.json or run {} to discover other JDKs.", "jsh list --scan".green());
         }
@@ -80,6 +86,11 @@ pub fn list_command(scan_system: bool) -> Result<()> {
     
     println!("{}", "-".repeat(80).bright_black());
     println!("Total: {} JDK(s)", jdks.len());
+    print_unavailable(&unavailable);
+
+    if current_version.is_some_and(|key| unavailable.iter().any(|(id, _)| *id == key)) {
+        println!("{}", "The configured current JDK is unavailable; choose another with jsh use.".yellow());
+    }
     
     let has_active_in_env = jdks.iter().any(|(_, info)| {
         java_home_path.as_ref().map(|p| same_jdk_path(p, &info.path)).unwrap_or(false)
@@ -113,4 +124,13 @@ pub fn list_command(scan_system: bool) -> Result<()> {
     }
     
     Ok(())
+}
+
+fn print_unavailable(unavailable: &[(&String, &crate::config::JdkInfo)]) {
+    if unavailable.is_empty() { return; }
+    println!("\n{}", format!("{} unavailable registration(s):", unavailable.len()).yellow());
+    for (id, info) in unavailable {
+        println!("  {id}: {}", info.path.display());
+    }
+    println!("Run {} to remove them.", "jsh list --prune".green());
 }

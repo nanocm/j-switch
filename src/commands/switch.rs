@@ -1,5 +1,5 @@
 use crate::env::{EnvUpdater, get_env_updater};
-use crate::error::Result;
+use crate::error::{JdkError, Result};
 use crate::jdk::JdkManager;
 use colored::*;
 
@@ -18,8 +18,16 @@ pub fn use_command(version: &str) -> Result<()> {
     // Update environment variables
     println!("\n{}", "Activating JDK...".cyan());
     let env_updater = get_env_updater();
-    env_updater.update_java_home(&jdk.path)?;
+    let previous = manager.get_current_version().cloned();
     manager.set_current(key)?;
+    if let Err(error) = env_updater.update_java_home(&jdk.path) {
+        if let Err(rollback) = manager.set_current_option(previous) {
+            return Err(JdkError::EnvError(format!(
+                "{error}; restoring the previous JDK selection also failed: {rollback}"
+            )));
+        }
+        return Err(error);
+    }
 
     println!("\n{} {}", "[OK]".green().bold(), "Successfully switched to JDK".green());
 

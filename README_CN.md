@@ -1,256 +1,79 @@
-# jsh - JDK 切换助手
+# j-switch (`jsh`)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue.svg)](https://github.com/yourusername/j-switch)
+适用于 Windows、macOS 和 Linux 的 JDK 管理工具。本仓库基于 [YiTouch/j-switch](https://github.com/YiTouch/j-switch) fork。
 
-[English](README.md) | [中文文档](README_CN.md)
+`jsh` 可以发现本机 JDK、下载 Eclipse Temurin JDK、分别保存相同版本的安装，并切换当前使用的 JDK。
 
-## 中文文档
+## 安装
 
-一个使用 Rust 编写的JDK 版本管理和切换命令行工具。
+可从 [Releases](https://github.com/nanocm/j-switch/releases) 下载二进制文件，或使用 Rust 1.85 及以上版本从源码编译（项目采用 Rust 2024 edition）：
 
-### ✨ 功能特性
-
-- 🔍 **JDK 发现**：`list` 检查已登记的 JDK、下载目录、配置的 `scan_dirs` 和 `JAVA_HOME`；`list --scan` 搜索系统目录
-- 🔄 **快速切换**：一条命令即可切换不同的 JDK 版本
-- ⚙️ **环境管理**：自动更新 `JAVA_HOME` 和 `PATH` 环境变量
-- 📦 **版本管理**：列出、安装和管理多个 JDK 版本
-- 💾 **持久化配置**：将 JDK 配置保存在 `config.json`
-- 🎨 **美观界面**：彩色、直观的命令行界面
-
-### 📋 目录
-
-- [系统要求](#-系统要求)
-- [重要提示](#️-重要提示)
-- [安装方法](#-安装方法)
-- [快速开始](#-快速开始)
-- [命令说明](#-命令说明)
-- [使用示例](#-使用示例)
-- [配置文件](#️-配置文件)
-- [故障排除](#-故障排除)
-- [贡献指南](#-贡献指南)
-- [开源协议](#-开源协议)
-- [致谢](#-致谢)
-- [开发路线图](#️-开发路线图)
-
-### 🔧 系统要求
-
-- **操作系统**：Windows 10+
-- **Rust**：1.70 或更高版本（仅编译时需要）
-- **JDK**：至少一个 JDK 安装（版本 7+）
-
-### ⚠️ 重要提示
-
-> **关于 JDK 下载功能**  
-> 本工具使用的是 GitHub 上的 OpenJDK 资源。由于中国国内网络环境限制（GFW），**下载 JDK 功能需要科学上网**才能正常使用。  
-> 除下载功能外，其他所有功能（如列出、切换、管理已安装的 JDK）均不受网络影响，可正常使用。
-
-> **JDK路径扫描深度**  
-> `jsh list --scan` 会搜索常见系统目录（Windows 上为 C: 至 G: 盘根目录），深度最多 5 层，可能需要较长时间。日常使用 `jsh list` 只扫描托管目录和您在 `scan_dirs` 中指定的目录。
-
-> **JDK 下载源说明**  
-> 本工具的 JDK 下载功能使用以下官方源：
-> - **主要来源**：[Adoptium (Eclipse Temurin)](https://adoptium.net/) - 提供经过 TCK 认证的高质量 OpenJDK 二进制文件
-> - **API 接口**：通过 Adoptium 的官方 API 获取可用版本列表和下载链接
-> - **资源托管**：下载资源托管在 GitHub，确保稳定性和可靠性
->
-> 所有下载的 JDK 均为官方认证的 OpenJDK 发行版，安全可靠。
-
-### 📦 安装方法
-
-#### 方法 1：下载预编译二进制文件
-
-从 [Releases](https://github.com/YiTouch/j-switch/releases) 页面下载最新版本。
-
-#### 方法 2：从源码编译
-
-```bash
-# 克隆仓库
-git clone https://github.com/YiTouch/j-switch.git
-cd j-switch
-
-# 编译 Release 版本
-cargo build --release
-
-# 二进制文件位于 target/release/jsh.exe（Windows）
+```sh
+cargo build --release --locked
 ```
 
-### 🚀 快速开始
+Windows 产物是 `target/release/jsh.exe`，其他系统是 `target/release/jsh`。请将可执行文件及其旁边的 `config.json`、`jdks`、`downloads` 和 Windows 上的 `jsh-current` 保存在同一位置。Windows 上请选一个普通用户可写的专用目录，不要把 `jsh.exe` 放在 `Program Files` 或 Windows 系统目录下。将可执行文件所在目录加入 `PATH` 后，即可在任意终端运行 `jsh`。
 
-1. **列出所有检测到的 JDK**：
-```bash
+## 命令
+
+| 命令 | 作用 |
+| --- | --- |
+| `jsh list` | 刷新托管目录、`JAVA_HOME` 和配置的扫描目录，列出已登记的 JDK。 |
+| `jsh list --scan` | 额外搜索常见系统位置。Windows 上会扫描 C: 至 G: 盘、最多 5 层，可能较慢。 |
+| `jsh list --prune` | 清理路径已失效的登记项。断开连接的磁盘上的 JDK 日后仍可重新扫描登记。 |
+| `jsh current` | 显示 `JAVA_HOME` 指向的 JDK；未设置时使用已保存的选择。如果 `PATH` 中的 `java` 来自其他位置，会给出提醒。 |
+| `jsh use <版本或ID>` | 切换到已登记的 JDK。 |
+| `jsh search [关键词]` | 搜索可下载的 Eclipse Temurin 版本。 |
+| `jsh download <主版本>` | 下载、校验、安装并登记该主版本最新的 Temurin JDK。 |
+
+示例：
+
+```sh
 jsh list
-```
-
-首次发现安装在其他位置的 JDK 时，运行 `jsh list --scan`；扫描结果会登记到配置中，后续 `jsh list` 可直接显示。
-
-2. **切换到指定 JDK 版本**：
-```bash
-jsh use 17
-```
-
-3. **查看当前激活的 JDK**：
-```bash
+jsh download 21
+jsh list
+jsh use 21
 jsh current
 ```
 
-### 📝 命令说明
+`jsh list` 会显示每个安装的稳定 ID。某个主版本只有一个安装时，可以直接使用 `jsh use 21`；若有多个安装，请使用列表中的 ID。完整版本号在只匹配一个安装时也可使用。旧版配置中以主版本号为键的记录会自动迁移。
 
-| 命令 | 说明 | 示例 |
-|------|------|------|
-| `jsh list` | 列出已登记、托管下载、`scan_dirs` 和 `JAVA_HOME` 中的 JDK | `jsh list` |
-| `jsh list --scan` | 扫描常见系统位置并登记找到的 JDK | `jsh list --scan` |
-| `jsh current` | 显示当前激活的 JDK | `jsh current` |
-| `jsh use <版本或ID>` | 切换到指定 JDK；版本对应多个安装时需使用 `list` 中的 ID | `jsh use 17` |
-| `jsh download <版本>` | 下载、安装并注册 JDK | `jsh download 21` |
-| `jsh search [版本]` | 搜索可下载的 JDK 版本 | `jsh search 17` |
-| `jsh --help` | 显示帮助信息 | `jsh --help` |
+下载的文件会按 Adoptium 提供的大小和 SHA-256 校验。校验通过的压缩包留在下载缓存中，安装后的 JDK 位于可执行文件旁的 `jdks` 目录，并会立即出现在 `jsh list` 中。`--vendor temurin` 和 `--vendor adoptium` 是同一下载源的两个名称；目前不支持其他发行商或自定义镜像。
 
-### 💡 使用示例
+## 在当前终端切换
 
-下载的 JDK 保存在 `jsh.exe` 所在目录的 `jdks` 子目录，并在下载完成后直接注册。`jsh list` 会显示每个安装的稳定 ID。只有一个 JDK 17 时可用 `jsh use 17`；如果有多个 JDK 17，请复制目标安装的 ID 执行 `jsh use <ID>`。完整版本号（如 `17.0.10`）在唯一匹配时也可使用。旧版 `config.json` 中以主版本号为键的记录会自动迁移。
+### Windows
 
-#### 列出 JDK 安装
+首次运行 `jsh use <版本或ID>` 时，需要使用管理员终端设置**系统级** `JAVA_HOME` 和 `PATH`。`jsh` 会在可执行文件旁建立 `jsh-current` 目录联接，并把 `jsh-current\bin` 放在系统 `PATH` 的最前面。首次配置后重新打开一次终端，让终端继承这些环境变量。
 
-```bash
-$ jsh list
+以后运行 `jsh use` 只需切换目录联接目标。只要当前终端的 `JAVA_HOME` 指向 `jsh-current`，且 `java` 首先从 `jsh-current\bin` 找到，新版本会立即生效。若其他 Java 路径排在前面，`jsh current` 会提醒你。后续切换要求普通用户能够写入 `jsh.exe` 所在目录。
 
-正在扫描 JDK 安装...
+这项首次配置会改变其他终端和用户看到的系统 Java 版本。请将安装目录保存在自己可控制的位置，不要向其他用户开放写权限。
 
-已安装的 JDK：
-================================================================================
-* JDK 17 (当前)
-  ID: 17-17.0.10-0123456789abcdef
-  Use: jsh use 17
-  版本: 17.0.10
-  供应商: OpenJDK
-  路径: C:\Program Files\Java\jdk-17
+### macOS 和 Linux
 
-- JDK 11
-  版本: 11.0.8
-  路径: C:\Program Files\Java\jdk-11.0.8
+`jsh use` 会更新 `.zshrc` 或 `.bashrc` 中由 jsh 管理的配置。若要在当前终端生效，请按所用 shell 运行 `source ~/.zshrc` 或 `source ~/.bashrc`。新终端会自动读取更新后的配置。
 
-- JDK 8
-  版本: 1.8.0_291
-  供应商: Oracle
-  路径: C:\Program Files\Java\jdk1.8.0_291
+## 配置文件
 
---------------------------------------------------------------------------------
-总计: 3 个 JDK
-```
+`config.json` 位于可执行文件旁。`scan_dirs` 和 `download_dir` 中的相对路径以该目录为基准。扫描目录可以直接是 JDK 根目录；向下扫描最多 5 层。`jsh list` 会单独显示失效登记项，使用 `jsh list --prune` 可清理。
 
-#### 切换 JDK 版本
-
-Windows 首次使用时，请以管理员身份运行一次 `jsh use <版本或ID>`。jsh 会在可执行文件旁创建 `jsh-current` 目录联接，并把系统 `JAVA_HOME` 和 `PATH` 指向这个固定入口。随后重新打开终端一次；以后运行 `jsh use` 只切换联接目标，当前终端中的 `java` 命令会立即使用新版本，无需再次以管理员身份运行。
-
-```bash
-$ jsh use 11
-
-Selected JDK:
-  Version: JDK 11
-  Path: C:\Program Files\Java\jdk-11.0.8
-
-Activating JDK...
-[OK] System JAVA_HOME now points to: C:\Tools\jsh\jsh-current
-[OK] System PATH now starts with: C:\Tools\jsh\jsh-current\bin
-[OK] Active JDK junction: C:\Tools\jsh\jsh-current -> C:\Program Files\Java\jdk-11.0.8
-
-[OK] Successfully switched to JDK
-
-One-time setup:
-  Reopen this terminal after the stable JDK path is added to JAVA_HOME and PATH.
-```
-
-#### 查看当前 JDK
-
-```bash
-$ jsh current
-
-当前 JDK:
-============================================================
-版本: JDK 11
-完整版本: 11.0.8
-路径: C:\Program Files\Java\jdk-11.0.8
-============================================================
-
-[OK] JAVA_HOME 已正确设置
-```
-
-### ⚙️ 配置文件
-
-jsh 将配置存储在可执行文件旁的 `config.json`。在 `scan_dirs` 中填写要自动扫描的目录；每个目录最多向下扫描 5 层。直接填写 JDK 根目录也可以。相对路径以可执行文件所在目录为基准。
-
-配置示例：
 ```json
 {
-  "jdks": {
-    "11-11.0.8-fedcba9876543210": {
-      "path": "C:\\Program Files\\Java\\jdk-11.0.8",
-      "version": "11",
-      "vendor": null,
-      "java_version": "11.0.8"
-    },
-    "17-17.0.10-0123456789abcdef": {
-      "path": "C:\\Program Files\\Java\\jdk-17",
-      "version": "17",
-      "vendor": "OpenJDK",
-      "java_version": "17.0.10"
-    }
-  },
-  "current_jdk": "17-17.0.10-0123456789abcdef",
-  "download_dir": "C:\\path\\to\\jsh\\downloads",
+  "current_jdk": null,
+  "jdks": {},
+  "download_dir": "downloads",
   "scan_dirs": ["D:\\Java", "E:\\SDKs"]
 }
 ```
 
-#### 添加到 PATH
+请按实际位置修改路径。`download_dir` 存放经过校验的压缩包；安装后的 JDK 始终位于 `jsh` 旁的 `jdks` 目录。移动工具时，使用相对 `download_dir` 更方便。
 
-**Windows**：
-```powershell
-# 临时添加到 PATH（当前会话）
-$env:Path += ";D:\xx\xx\(jsh.exe)"
+## 开发与验证
 
-# 永久添加到 PATH（以管理员身份运行 PowerShell）
-[Environment]::SetEnvironmentVariable("Path", $env:Path + ";D:\xx\xx\(jsh.exe)", "User")
+```sh
+cargo test --locked
+cargo build --release --locked
 ```
 
-### 🐛 故障排除
-
-#### JDK 未被检测到
-
-如果您的 JDK 未被自动检测：
-
-1. **指定目录或运行完整扫描**：在 `config.json` 的 `scan_dirs` 中填写目录，或运行 `jsh list --scan`。后者在 Windows 上搜索 C: 至 G: 盘根目录，最多 5 层。
-
-
-#### 环境变量未更新（Windows）
-
-1. **首次配置后重新打开终端一次**；以后切换会在当前终端立即生效。
-2. **首次配置需要管理员权限**，因为需要更新系统级 `JAVA_HOME` 和 `PATH`；后续只切换目录联接。
-3. **手动验证**：`java -version` 和 PowerShell 中的 `$env:JAVA_HOME`。
-
-### 🤝 贡献指南
-
-欢迎贡献！
-
-### 📄 开源协议
-
-本项目采用 MIT 协议 - 详见 [LICENSE](LICENSE) 文件。
-
-### 🙏 致谢
-
-- 灵感来自nvm工具
-
-
-### 🗺️ 开发路线图
-
-- [x] JDK 自动检测
-- [x] JDK 版本切换
-- [x] 环境变量管理
-- [x] JDK 下载和安装
-- [x] 版本搜索功能
-
----
-
-用 ❤️ 和 🦀 Rust 制作
+参阅 [v0.2.0 发布说明](RELEASE_NOTES.md)。本项目使用 [MIT 许可证](LICENSE)。

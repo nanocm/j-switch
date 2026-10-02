@@ -2,6 +2,8 @@ use crate::error::{JdkError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
+use std::fs::{File, OpenOptions};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -74,14 +76,40 @@ impl Config {
     }
 
     pub fn save(&self) -> Result<()> {
+        self.save_to_path(&Self::config_path()?)
+    }
+
+    fn save_to_path(&self, path: &Path) -> Result<()> {
+        let dir = path.parent().ok_or_else(|| JdkError::ConfigError(
+            "Config path has no parent directory".to_string()
+        ))?;
+        fs::create_dir_all(&dir)
+            .map_err(|e| JdkError::ConfigError(format!("Failed to create config dir: {e}")))?;
+        let content = serde_json::to_string_pretty(self)
+            .map_err(|e| JdkError::ConfigError(format!("Failed to serialize config: {e}")))?;
+        let mut staged = tempfile::NamedTempFile::new_in(&dir)
+            .map_err(|e| JdkError::ConfigError(format!("Failed to stage config: {e}")))?;
+        staged.write_all(content.as_bytes())
+            .and_then(|_| staged.flush())
+            .and_then(|_| staged.as_file().sync_all())
+            .map_err(|e| JdkError::ConfigError(format!("Failed to write staged config: {e}")))?;
+        staged.persist(path)
+            .map_err(|e| JdkError::ConfigError(format!("Failed to replace config: {}", e.error)))?;
+        Ok(())
+    }
+
+    /// Keep the read-modify-write cycle in one process exclusive. Atomic save
+    /// protects readers; this lock also prevents concurrent lost updates.
+    pub fn lock_registry() -> Result<File> {
         let dir = Self::config_dir()?;
         fs::create_dir_all(&dir)
             .map_err(|e| JdkError::ConfigError(format!("Failed to create config dir: {e}")))?;
-        let path = Self::config_path()?;
-        let content = serde_json::to_string_pretty(self)
-            .map_err(|e| JdkError::ConfigError(format!("Failed to serialize config: {e}")))?;
-        fs::write(&path, content)
-            .map_err(|e| JdkError::ConfigError(format!("Failed to write config: {e}")))
+        let lock_path = dir.join("config.lock");
+        let file = OpenOptions::new().read(true).write(true).create(true).open(lock_path)
+            .map_err(|e| JdkError::ConfigError(format!("Failed to open config lock: {e}")))?;
+        fs2::FileExt::lock_exclusive(&file)
+            .map_err(|e| JdkError::ConfigError(format!("Failed to lock config: {e}")))?;
+        Ok(file)
     }
 
     /// Migrate the former major-version keys without losing the active JDK.
@@ -123,8 +151,6 @@ impl Config {
         Ok((key, changed))
     }
 
-    pub fn set_current(&mut self, key: String) { self.current_jdk = Some(key); }
-
     pub fn get_current(&self) -> Option<&JdkInfo> {
         self.current_jdk.as_ref().and_then(|key| self.jdks.get(key))
     }
@@ -132,10 +158,12 @@ impl Config {
 
 impl Default for Config {
     fn default() -> Self {
-        let download_dir = Self::config_dir()
-            .unwrap_or_else(|_| PathBuf::from("."))
-            .join("downloads");
-        Self { current_jdk: None, jdks: HashMap::new(), download_dir, scan_dirs: Vec::new() }
+        Self {
+            current_jdk: None,
+            jdks: HashMap::new(),
+            download_dir: PathBuf::from("downloads"),
+            scan_dirs: Vec::new(),
+        }
     }
 }
 
@@ -193,5 +221,17 @@ mod tests {
         let customized = r#"{"current_jdk":null,"jdks":{},"download_dir":"downloads","scan_dirs":["D:\\Java","E:\\SDKs"]}"#;
         let config: Config = serde_json::from_str(customized).unwrap();
         assert_eq!(config.scan_dirs, vec![PathBuf::from("D:\\Java"), PathBuf::from("E:\\SDKs")]);
+    }
+
+    #[test]
+    fn atomic_save_replaces_an_existing_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        let mut config = Config::default();
+        config.save_to_path(&path).unwrap();
+        config.scan_dirs.push(PathBuf::from("custom"));
+        config.save_to_path(&path).unwrap();
+        let loaded: Config = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        assert_eq!(loaded.scan_dirs, vec![PathBuf::from("custom")]);
     }
 }

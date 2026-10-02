@@ -1,10 +1,11 @@
 [package]
 name = "j-switch"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
-authors = ["GT <GT@example.com>"]
+authors = ["YiTouch contributors", "nanocm"]
 description = "A command-line tool to manage and switch between multiple JDK installations"
 license = "MIT"
+repository = "https://github.com/nanocm/j-switch"
 
 [[bin]]
 name = "jsh"
@@ -27,6 +28,7 @@ tar = "0.4.44"
 async-trait = "0.1.89"
 sha2 = "0.10"
 tempfile = "3"
+fs2 = "0.4"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"

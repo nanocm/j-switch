@@ -98,15 +98,16 @@ impl JdkDetector {
             return false;
         }
         
-        // Check for java executable
+        // A bundled JRE also has java and lib, but cannot compile Java code.
         let java_exe = Self::get_java_executable(path);
-        if !java_exe.exists() {
+        let javac_exe = Self::get_javac_executable(path);
+        if !java_exe.is_file() || !javac_exe.is_file() {
             return false;
         }
         
         // Check for required directories
         let lib_dir = path.join("lib");
-        lib_dir.exists()
+        lib_dir.is_dir()
     }
 
     /// Get the java executable path for a JDK
@@ -120,6 +121,13 @@ impl JdkDetector {
         {
             jdk_path.join("bin").join("java")
         }
+    }
+
+    fn get_javac_executable(jdk_path: &Path) -> PathBuf {
+        #[cfg(target_os = "windows")]
+        { jdk_path.join("bin").join("javac.exe") }
+        #[cfg(not(target_os = "windows"))]
+        { jdk_path.join("bin").join("javac") }
     }
     
     /// Get JDK information by executing java -version
@@ -213,6 +221,20 @@ impl JdkDetector {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rejects_a_jre_without_javac() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path();
+        std::fs::create_dir(root.join("bin")).unwrap();
+        std::fs::create_dir(root.join("lib")).unwrap();
+        let java = if cfg!(windows) { "java.exe" } else { "java" };
+        let javac = if cfg!(windows) { "javac.exe" } else { "javac" };
+        std::fs::write(root.join("bin").join(java), []).unwrap();
+        assert!(!JdkDetector::is_valid_jdk(root));
+        std::fs::write(root.join("bin").join(javac), []).unwrap();
+        assert!(JdkDetector::is_valid_jdk(root));
+    }
 
     #[test]
     fn test_parse_version_output() {

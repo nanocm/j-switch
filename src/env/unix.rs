@@ -1,6 +1,5 @@
 use crate::env::EnvUpdater;
 use crate::error::{JdkError, Result};
-use std::fs::{OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 
@@ -30,22 +29,25 @@ impl UnixEnvUpdater {
 
     fn update_shell_rc(&self, java_home: &Path) -> Result<()> {
         let rc_path = Self::get_shell_rc_path()?;
-        let java_home_str = java_home.to_string_lossy();
+        let java_home_str = java_home.to_str()
+            .ok_or_else(|| JdkError::EnvError("JDK path is not valid UTF-8".to_string()))?;
+        let quoted_home = Self::shell_quote(java_home_str);
+        let write_path = if rc_path.exists() { rc_path.canonicalize()? } else { rc_path.clone() };
 
         // Read existing content
         let mut lines = Vec::new();
         let mut found_java_home = false;
         let mut found_path = false;
 
-        if rc_path.exists() {
-            let file = std::fs::File::open(&rc_path)
+        if write_path.exists() {
+            let file = std::fs::File::open(&write_path)
                 .map_err(|e| JdkError::IoError(e))?;
             let reader = BufReader::new(file);
 
             for line in reader.lines() {
                 let line = line.map_err(|e| JdkError::IoError(e))?;
                 if line.contains("export JAVA_HOME=") && line.contains("# jsh managed") {
-                    lines.push(format!("export JAVA_HOME=\"{}\"  # jsh managed", java_home_str));
+                    lines.push(format!("export JAVA_HOME={quoted_home}  # jsh managed"));
                     found_java_home = true;
                 } else if line.contains("export PATH=") && line.contains("$JAVA_HOME/bin") && line.contains("# jsh managed") {
                     lines.push(format!("export PATH=\"$JAVA_HOME/bin:$PATH\"  # jsh managed"));
@@ -58,29 +60,37 @@ impl UnixEnvUpdater {
 
         // Add new entries if not found
         if !found_java_home {
-            lines.push(format!("\n# jsh managed - do not edit manually"));
-            lines.push(format!("export JAVA_HOME=\"{}\"  # jsh managed", java_home_str));
+            lines.push("\n# jsh managed - do not edit manually".to_string());
+            lines.push(format!("export JAVA_HOME={quoted_home}  # jsh managed"));
         }
         if !found_path {
             lines.push(format!("export PATH=\"$JAVA_HOME/bin:$PATH\"  # jsh managed"));
         }
 
         // Write back
-        let mut file = OpenOptions::new()
-            .write(true)
-            .truncate(true)
-            .create(true)
-            .open(&rc_path)
-            .map_err(|e| JdkError::IoError(e))?;
+        let parent = write_path.parent()
+            .ok_or_else(|| JdkError::EnvError("Shell profile has no parent directory".to_string()))?;
+        let mut file = tempfile::NamedTempFile::new_in(parent)?;
+        if let Ok(metadata) = std::fs::metadata(&write_path) {
+            file.as_file().set_permissions(metadata.permissions())?;
+        }
 
         for line in lines {
             writeln!(file, "{}", line).map_err(|e| JdkError::IoError(e))?;
         }
+        file.flush()?;
+        file.as_file().sync_all()?;
+        file.persist(&write_path)
+            .map_err(|e| JdkError::EnvError(format!("Cannot replace shell profile: {}", e.error)))?;
 
         println!("[OK] Updated {}", rc_path.display());
         println!("  Please run: source {}", rc_path.display());
 
         Ok(())
+    }
+
+    fn shell_quote(value: &str) -> String {
+        format!("'{}'", value.replace('\'', "'\\''"))
     }
 }
 
@@ -90,4 +100,15 @@ impl EnvUpdater for UnixEnvUpdater {
         Ok(())
     }
 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::UnixEnvUpdater;
+
+    #[test]
+    fn shell_path_does_not_expand_special_characters() {
+        assert_eq!(UnixEnvUpdater::shell_quote("/tmp/$HOME/`test`/a'b"),
+            "'/tmp/$HOME/`test`/a'\\''b'");
+    }
 }

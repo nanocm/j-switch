@@ -2,16 +2,19 @@ use crate::config::{Config, JdkInfo, same_jdk_path};
 use crate::error::{JdkError, Result};
 use crate::jdk::detector::JdkDetector;
 use std::path::Path;
+use std::fs::File;
 
 pub struct JdkManager {
     config: Config,
+    _registry_lock: Option<File>,
 }
 
 impl JdkManager {
     pub fn new() -> Result<Self> {
+        let lock = Config::lock_registry()?;
         let mut config = Config::load()?;
         if config.normalize_registry()? { config.save()?; }
-        Ok(Self { config })
+        Ok(Self { config, _registry_lock: Some(lock) })
     }
 
     /// Refresh managed installs and JAVA_HOME. A system scan is explicit
@@ -65,13 +68,42 @@ impl JdkManager {
     }
 
     pub fn list_jdks(&self) -> Vec<(&String, &JdkInfo)> {
-        let mut jdks: Vec<_> = self.config.jdks.iter().collect();
+        let mut jdks: Vec<_> = self.config.jdks.iter()
+            .filter(|(_, info)| JdkDetector::is_valid_jdk(&info.path))
+            .collect();
         jdks.sort_by(|a, b| {
             let a_major = a.1.version.parse::<u32>().unwrap_or(0);
             let b_major = b.1.version.parse::<u32>().unwrap_or(0);
             a_major.cmp(&b_major).then_with(|| a.0.cmp(b.0))
         });
         jdks
+    }
+
+    pub fn unavailable_jdks(&self) -> Vec<(&String, &JdkInfo)> {
+        let mut unavailable: Vec<_> = self.config.jdks.iter()
+            .filter(|(_, info)| !JdkDetector::is_valid_jdk(&info.path))
+            .collect();
+        unavailable.sort_by(|a, b| a.0.cmp(b.0));
+        unavailable
+    }
+
+    /// Removal is explicit because a JDK on a disconnected drive may return.
+    pub fn prune_unavailable(&mut self) -> Result<usize> {
+        let removed = self.prune_unavailable_in_memory();
+        if removed > 0 { self.config.save()?; }
+        Ok(removed)
+    }
+
+    fn prune_unavailable_in_memory(&mut self) -> usize {
+        let before = self.config.jdks.len();
+        self.config.jdks.retain(|_, info| JdkDetector::is_valid_jdk(&info.path));
+        let removed = before - self.config.jdks.len();
+        if removed > 0 {
+            if self.config.current_jdk.as_ref().is_some_and(|key| !self.config.jdks.contains_key(key)) {
+                self.config.current_jdk = None;
+            }
+        }
+        removed
     }
 
     pub fn get_current(&self) -> Option<&JdkInfo> { self.config.get_current() }
@@ -84,7 +116,8 @@ impl JdkManager {
             return Self::validate_jdk(selector, info);
         }
         let matches: Vec<_> = self.config.jdks.iter()
-            .filter(|(_, info)| info.version == selector || info.java_version.as_deref() == Some(selector))
+            .filter(|(_, info)| JdkDetector::is_valid_jdk(&info.path)
+                && (info.version == selector || info.java_version.as_deref() == Some(selector)))
             .collect();
         match matches.as_slice() {
             [] => Err(JdkError::JdkNotFound(selector.to_string())),
@@ -105,8 +138,14 @@ impl JdkManager {
     }
 
     pub fn set_current(&mut self, key: String) -> Result<()> {
-        if !self.config.jdks.contains_key(&key) { return Err(JdkError::JdkNotFound(key)); }
-        self.config.set_current(key);
+        self.set_current_option(Some(key))
+    }
+
+    pub fn set_current_option(&mut self, key: Option<String>) -> Result<()> {
+        if let Some(ref key) = key {
+            if !self.config.jdks.contains_key(key) { return Err(JdkError::JdkNotFound(key.clone())); }
+        }
+        self.config.current_jdk = key;
         self.config.save()
     }
 }
@@ -122,6 +161,8 @@ mod tests {
         fs::create_dir_all(path.join("lib")).unwrap();
         let executable = if cfg!(windows) { "java.exe" } else { "java" };
         fs::write(path.join("bin").join(executable), b"").unwrap();
+        let compiler = if cfg!(windows) { "javac.exe" } else { "javac" };
+        fs::write(path.join("bin").join(compiler), b"").unwrap();
         JdkInfo {
             path,
             version: "17".to_string(),
@@ -137,11 +178,28 @@ mod tests {
         let (first_id, _) = config.register_jdk(fake_jdk(dir.path(), "one", "17.0.10")).unwrap();
         let (second_id, _) = config.register_jdk(fake_jdk(dir.path(), "two", "17.0.11")).unwrap();
         config.register_jdk(fake_jdk(dir.path(), "three", "17.0.10")).unwrap();
-        let manager = JdkManager { config };
+        let manager = JdkManager { config, _registry_lock: None };
 
         assert!(matches!(manager.resolve_jdk("17"), Err(JdkError::AmbiguousJdk(_, _))));
         assert!(matches!(manager.resolve_jdk("17.0.10"), Err(JdkError::AmbiguousJdk(_, _))));
         assert_eq!(manager.resolve_jdk("17.0.11").unwrap().0, second_id);
         assert_eq!(manager.resolve_jdk(&first_id).unwrap().1.path, dir.path().join("one"));
+    }
+
+    #[test]
+    fn missing_registration_does_not_make_a_version_ambiguous() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut config = Config::default();
+        let (valid_id, _) = config.register_jdk(fake_jdk(dir.path(), "valid", "17.0.11")).unwrap();
+        let missing = fake_jdk(dir.path(), "missing", "17.0.10");
+        let (missing_id, _) = config.register_jdk(missing.clone()).unwrap();
+        fs::remove_dir_all(&missing.path).unwrap();
+        let mut manager = JdkManager { config, _registry_lock: None };
+        assert_eq!(manager.resolve_jdk("17").unwrap().0, valid_id);
+        assert_eq!(manager.unavailable_jdks().len(), 1);
+        manager.config.current_jdk = Some(missing_id);
+        assert_eq!(manager.prune_unavailable_in_memory(), 1);
+        assert!(manager.config.current_jdk.is_none());
+        assert_eq!(manager.list_jdks().len(), 1);
     }
 }
