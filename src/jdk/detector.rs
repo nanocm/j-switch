@@ -281,6 +281,6 @@ OpenJDK 64-Bit Server VM Temurin-17.0.2+8 (build 17.0.2+8, mixed mode)"#;
         std::fs::create_dir(&target).unwrap();
         let link = temp.path().join("jsh-current");
         std::os::unix::fs::symlink(&target, &link).unwrap();
-        assert_eq!(JdkDetector::installation_path(&link).unwrap(), target);
+        assert_eq!(JdkDetector::installation_path(&link).unwrap(), target.canonicalize().unwrap());
     }
 }

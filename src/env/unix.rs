@@ -199,14 +199,14 @@ mod tests {
             .stdin(Stdio::piped()).stdout(Stdio::piped()).spawn().unwrap();
         let mut input = child.stdin.take().unwrap();
         let mut output = BufReader::new(child.stdout.take().unwrap());
-        writeln!(input, ". \"$1\"; \"$JAVA_HOME/bin/java\"").unwrap();
+        writeln!(input, ". \"$1\"; java").unwrap();
         input.flush().unwrap();
         let mut line = String::new();
         output.read_line(&mut line).unwrap();
         assert_eq!(line.trim(), "17");
 
         UnixEnvUpdater::switch_symlink_at(&link, &second).unwrap();
-        writeln!(input, "\"$JAVA_HOME/bin/java\"").unwrap();
+        writeln!(input, "java").unwrap();
         drop(input);
         line.clear();
         output.read_line(&mut line).unwrap();

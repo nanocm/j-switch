@@ -6,7 +6,7 @@ A small JDK manager for Windows, macOS, and Linux. This repository is a [fork of
 
 ## Install
 
-Download a binary from [Releases](https://github.com/nanocm/j-switch/releases), or build from source with Rust 1.88 or newer (the locked dependencies require it):
+Download a binary from [Releases](https://github.com/nanocm/j-switch/releases) (Windows x64, Linux x64, or macOS ARM64/x64), or build from source with Rust 1.88 or newer (the locked dependencies require it):
 
 ```sh
 cargo build --release --locked

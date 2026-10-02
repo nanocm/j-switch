@@ -6,7 +6,7 @@
 
 ## 安装
 
-可从 [Releases](https://github.com/nanocm/j-switch/releases) 下载二进制文件，或使用 Rust 1.88 及以上版本从源码编译（锁定的依赖需要此版本）：
+可从 [Releases](https://github.com/nanocm/j-switch/releases) 下载二进制文件（Windows x64、Linux x64、macOS ARM64/x64），或使用 Rust 1.88 及以上版本从源码编译（锁定的依赖需要此版本）：
 
 ```sh
 cargo build --release --locked

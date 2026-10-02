@@ -9,6 +9,7 @@ This release makes downloaded JDKs visible immediately, keeps installations with
 - JRE installations are excluded from JDK discovery. `jsh current` also reports when `java` on `PATH` differs from `JAVA_HOME`.
 - Configuration writes are atomic and serialized across jsh processes. `jsh use` restores the previous selection if environment setup fails.
 - On bash and zsh, a stable symbolic link lets later switches take effect in an open terminal after one-time profile loading. Shell profile updates quote paths safely. Windows setup uses user-scoped environment variables and checks that jsh is installed in a writable location.
+- Release archives include Windows x64, Linux x64, and both macOS ARM64 and x64 binaries, with SHA-256 checksums.
 
 ## Upgrade note
 

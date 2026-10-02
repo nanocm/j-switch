@@ -17,7 +17,7 @@ jobs:
             platform: windows-x64
           - os: ubuntu-latest
             platform: linux-x64
-          - os: macos-latest
+          - os: macos-15-arm64
             platform: macos
     runs-on: ${{ matrix.os }}
     steps:
@@ -27,7 +27,14 @@ jobs:
       - name: Test
         run: cargo test --locked
       - name: Build
+        if: runner.os != 'macOS'
         run: cargo build --release --locked
+      - name: Build both macOS architectures
+        if: runner.os == 'macOS'
+        run: |
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+          cargo build --release --locked --target aarch64-apple-darwin
+          cargo build --release --locked --target x86_64-apple-darwin
       - name: Package Windows binary
         if: runner.os == 'Windows'
         shell: pwsh
@@ -35,11 +42,18 @@ jobs:
           New-Item -ItemType Directory -Path dist -Force | Out-Null
           Compress-Archive -LiteralPath target/release/jsh.exe -DestinationPath "dist/jsh-${{ github.ref_name }}-${{ matrix.platform }}.zip"
       - name: Package Unix binary
-        if: runner.os != 'Windows'
+        if: runner.os == 'Linux'
         shell: bash
         run: |
           mkdir -p dist
           tar -czf "dist/jsh-${{ github.ref_name }}-${{ matrix.platform }}-$(uname -m).tar.gz" -C target/release jsh
+      - name: Package macOS binaries
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          mkdir -p dist
+          tar -czf "dist/jsh-${{ github.ref_name }}-macos-arm64.tar.gz" -C target/aarch64-apple-darwin/release jsh
+          tar -czf "dist/jsh-${{ github.ref_name }}-macos-x64.tar.gz" -C target/x86_64-apple-darwin/release jsh
       - uses: actions/upload-artifact@v4
         with:
           name: jsh-${{ matrix.platform }}
