@@ -161,7 +161,9 @@ impl JdkDetector {
     fn installation_path(path: &Path) -> Option<PathBuf> {
         #[cfg(target_os = "windows")]
         {
-            if junction::exists(path).ok()? {
+            // junction::exists can error on an ordinary directory because it
+            // queries reparse-point data. A regular JDK path is still valid.
+            if let Ok(true) = junction::exists(path) {
                 return junction::get_target(path).ok();
             }
         }
@@ -258,6 +260,13 @@ OpenJDK 64-Bit Server VM Temurin-17.0.2+8 (build 17.0.2+8, mixed mode)"#;
         let (version, vendor, _) = JdkDetector::parse_version_output(output2);
         assert_eq!(version, "17");
         assert_eq!(vendor.as_deref(), Some("Eclipse Temurin"));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn ordinary_jdk_directory_keeps_its_path() {
+        let temp = tempfile::tempdir().unwrap();
+        assert_eq!(JdkDetector::installation_path(temp.path()), Some(temp.path().to_path_buf()));
     }
 
     #[cfg(target_os = "windows")]

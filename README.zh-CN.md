@@ -1,23 +1,29 @@
-# j-switch
+<h1 align="center">j-switch</h1>
 
-用 `jsh` 管理 JDK：查找已有安装、下载 Eclipse Temurin，并在终端切换 Java 版本。
+<p align="center">发现本机 JDK，下载 Temurin，在终端切换 Java 版本。</p>
 
-**[下载最新版本](https://github.com/nanocm/j-switch/releases/latest)** · [English](README.md) · [更新说明](RELEASE_NOTES.md)
+<p align="center">
+  <a href="https://github.com/nanocm/j-switch/releases/latest"><strong>下载</strong></a> ·
+  <a href="README.md">English</a> ·
+  <a href="RELEASE_NOTES.md">更新说明</a>
+</p>
 
-提供 Windows x64、Linux x64、macOS x64/ARM64 的发布包。
+---
 
 ## 快速开始
 
-将 `jsh.exe`（或 `jsh`）解压到当前用户可写的目录，并把该目录加入 `PATH`。配置文件和托管的 JDK 会保存在可执行文件旁。
+**安装。** 下载适用于 Windows x64、Linux x64 或 macOS x64/ARM64 的发布包。将 `jsh.exe`（或 `jsh`）放在当前用户可写的目录，并把该目录加入 `PATH`。
 
-```sh
+**选择 JDK。** 以下命令可在 PowerShell、bash 和 zsh 中运行：
+
+```text
 jsh list
 jsh download 21
 jsh use 21
 jsh current
 ```
 
-首次运行 `jsh use` 后，需要完成一次终端配置：
+**首次切换。** 第一次运行 `jsh use` 后，需要完成一次终端配置：
 
 | 平台 | 首次操作 |
 | --- | --- |
@@ -28,21 +34,23 @@ jsh current
 
 ## 命令
 
-| 命令 | 作用 |
+| 要做什么 | 命令 |
 | --- | --- |
-| `jsh list` | 列出已登记的 JDK，并检查托管目录、`JAVA_HOME` 和配置的扫描目录。 |
-| `jsh list --scan` | 额外搜索常见系统位置，可能较慢。 |
-| `jsh list --prune` | 清理路径已失效的登记项。 |
-| `jsh search [关键词]` | 搜索可下载的 Temurin 版本。 |
-| `jsh download <主版本>` | 下载、校验、安装并登记 Temurin JDK。 |
-| `jsh use <版本或ID>` | 切换到已安装的 JDK。 |
-| `jsh current` | 显示当前 JDK，并检查 `PATH` 中的 Java。 |
+| 查找已登记及托管的 JDK | `jsh list` |
+| 额外搜索常见系统位置 | `jsh list --scan` |
+| 清理失效的登记项 | `jsh list --prune` |
+| 搜索可下载的 Temurin 版本 | `jsh search [关键词]` |
+| 下载并登记 JDK | `jsh download <主版本>` |
+| 切换已安装的 JDK | `jsh use <版本或ID>` |
+| 检查当前 Java | `jsh current` |
 
-相同版本的多个安装会保留不同 ID。如果 `jsh use 21` 匹配多个 JDK，请使用 `jsh list` 显示的 ID。
+`jsh list` 会分别保留相同版本的多个安装。如果一个版本匹配多个 JDK，请使用列表中的 ID 运行 `jsh use`。
 
-## 配置
+## 自定义扫描目录
 
-`config.json` 位于 `jsh` 旁。可在其中添加 `scan_dirs`；普通的 `jsh list` 不会扫描所有系统磁盘。例如：
+普通的 `jsh list` 会检查已登记的 JDK、托管的 `jdks` 目录、`JAVA_HOME` 和 `scan_dirs` 中的目录。只有加上 `--scan` 才会扩大到常见系统位置。
+
+在可执行文件旁的 `config.json` 中添加扫描目录：
 
 ```json
 {
@@ -53,13 +61,13 @@ jsh current
 }
 ```
 
-相对路径以可执行文件所在目录为基准。`download_dir` 设置压缩包缓存；安装后的 JDK 始终放在旁边的 `jdks` 目录。目前只支持从 Eclipse Temurin 下载，不支持自定义镜像。
+请按系统修改路径。相对路径以可执行文件所在目录为基准。`download_dir` 存放校验过的压缩包；安装后的 JDK 始终位于旁边的 `jdks` 目录。目前只支持从 Eclipse Temurin 下载。
 
-## 从源码构建
+## 构建
 
 需要 Rust 1.88 或更新版本：
 
-```sh
+```text
 cargo test --locked
 cargo build --release --locked
 ```

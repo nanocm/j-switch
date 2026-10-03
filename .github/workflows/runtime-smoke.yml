@@ -5,6 +5,58 @@ on:
   workflow_dispatch:
 
 jobs:
+  windows-jdk8:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Java 17 for switching test
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Build jsh
+        run: cargo build --release --locked
+      - name: Download, list, and switch real JDKs
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:NO_COLOR = '1'
+          $jsh = Join-Path $PWD 'target\release\jsh.exe'
+          $list = & $jsh list
+          if ($LASTEXITCODE -ne 0 -or -not ($list | Select-String -SimpleMatch 'JDK 17')) {
+            throw "Java 17 is missing from jsh list"
+          }
+          & $jsh download 8
+          if ($LASTEXITCODE -ne 0) { throw "jsh download 8 failed" }
+          $list = & $jsh list
+          if ($LASTEXITCODE -ne 0) { throw "jsh list failed" }
+          $list | Write-Output
+          if (-not ($list | Select-String -SimpleMatch 'JDK 8')) {
+            throw "Downloaded JDK 8 is missing from jsh list"
+          }
+          & $jsh use 17
+          if ($LASTEXITCODE -ne 0) { throw "jsh use 17 failed" }
+          $env:JAVA_HOME = Join-Path (Split-Path $jsh) 'jsh-current'
+          $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
+          & $jsh use 8
+          if ($LASTEXITCODE -ne 0) { throw "jsh use 8 failed" }
+          $javaVersion = (& java.exe -version 2>&1 | Out-String)
+          if ($LASTEXITCODE -ne 0 -or $javaVersion -notmatch 'version "1\.8\.0_') {
+            throw "Open terminal still uses the wrong Java: $javaVersion"
+          }
+          $javacVersion = (& javac.exe -version 2>&1 | Out-String)
+          if ($LASTEXITCODE -ne 0 -or $javacVersion -notmatch 'javac 1\.8\.0_') {
+            throw "Open terminal still uses the wrong javac: $javacVersion"
+          }
+          $current = & $jsh current
+          if ($LASTEXITCODE -ne 0 -or -not ($current | Select-String -SimpleMatch 'JDK 8')) {
+            throw "jsh current does not report JDK 8"
+          }
+          if ($current | Select-String -SimpleMatch 'java on PATH resolves to') {
+            throw "jsh current reports a PATH mismatch"
+          }
+
   real-jdk:
     strategy:
       fail-fast: false

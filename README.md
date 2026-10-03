@@ -1,48 +1,56 @@
-# j-switch
+<h1 align="center">j-switch</h1>
 
-Manage JDKs from your terminal with `jsh`: find existing installations, download Eclipse Temurin, and switch the active Java version.
+<p align="center">Find JDKs on your machine. Download Temurin. Switch the Java used by your terminal.</p>
 
-**[Download the latest release](https://github.com/nanocm/j-switch/releases/latest)** · [简体中文](README.zh-CN.md) · [Release notes](RELEASE_NOTES.md)
+<p align="center">
+  <a href="https://github.com/nanocm/j-switch/releases/latest"><strong>Download</strong></a> ·
+  <a href="README.zh-CN.md">简体中文</a> ·
+  <a href="RELEASE_NOTES.md">Release notes</a>
+</p>
 
-Release binaries are available for Windows x64, Linux x64, and macOS x64/ARM64.
+---
 
-## Quick start
+## Get started
 
-Extract `jsh.exe` (or `jsh`) into a directory your account can write to, then add that directory to `PATH`. The tool stores its configuration and managed JDKs beside the executable.
+**Install.** Download the release for Windows x64, Linux x64, or macOS x64/ARM64. Put `jsh.exe` (or `jsh`) in a directory your account can write to, and add that directory to `PATH`.
 
-```sh
+**Choose a JDK.** These commands work in PowerShell, bash, and zsh:
+
+```text
 jsh list
 jsh download 21
 jsh use 21
 jsh current
 ```
 
-The first `jsh use` needs one shell setup step:
+**First switch.** Complete one setup step after the first `jsh use`:
 
 | Platform | One-time step |
 | --- | --- |
-| Windows | Reopen the terminal to load the new user `JAVA_HOME` and `PATH`. |
+| Windows | Reopen the terminal to load your user `JAVA_HOME` and `PATH`. |
 | macOS / Linux | Run `source ~/.zshrc` or `source ~/.bashrc` in the current shell. |
 
 Later switches take effect in an open terminal when Java resolves from the `bin` directory under `jsh-current`. If another Java comes first on `PATH`, `jsh current` shows the mismatch.
 
 ## Commands
 
-| Command | What it does |
+| Task | Command |
 | --- | --- |
-| `jsh list` | Show registered JDKs and check managed installs, `JAVA_HOME`, and configured scan directories. |
-| `jsh list --scan` | Also search common system locations; this can be slow. |
-| `jsh list --prune` | Remove registrations whose JDK paths are unavailable. |
-| `jsh search [keyword]` | Search available Temurin versions. |
-| `jsh download <major>` | Download, verify, install, and register a Temurin JDK. |
-| `jsh use <version-or-ID>` | Switch to an installed JDK. |
-| `jsh current` | Show the active JDK and check the Java found on `PATH`. |
+| Find registered and managed JDKs | `jsh list` |
+| Search common system locations too | `jsh list --scan` |
+| Remove unavailable registrations | `jsh list --prune` |
+| Search downloadable Temurin versions | `jsh search [keyword]` |
+| Download and register a JDK | `jsh download <major>` |
+| Select an installed JDK | `jsh use <version-or-ID>` |
+| Check the active Java | `jsh current` |
 
-Installations sharing a version keep separate IDs. If `jsh use 21` matches more than one JDK, select one by its ID from `jsh list`.
+`jsh list` preserves installations sharing a version. If a version matches more than one JDK, use the displayed ID with `jsh use`.
 
-## Configuration
+## Scan your own directories
 
-`config.json` is stored beside `jsh`. To scan other locations, add `scan_dirs` there; ordinary `jsh list` does not search all system drives. For example:
+By default, `jsh list` checks registered JDKs, the managed `jdks` directory, `JAVA_HOME`, and directories in `scan_dirs`. It does not search entire drives unless you add `--scan`.
+
+Edit `config.json` beside the executable to add directories:
 
 ```json
 {
@@ -53,13 +61,13 @@ Installations sharing a version keep separate IDs. If `jsh use 21` matches more 
 }
 ```
 
-Relative paths are resolved from the executable's directory. `download_dir` controls the archive cache; installed JDKs always go into the adjacent `jdks` directory. Downloads currently use Eclipse Temurin only; custom mirrors are not supported.
+Use paths for your system. Relative paths start from the executable's directory. `download_dir` stores verified archives; installed JDKs stay in the adjacent `jdks` directory. Downloads currently use Eclipse Temurin only.
 
-## Build from source
+## Build
 
-Requires Rust 1.88 or newer:
+With Rust 1.88 or newer:
 
-```sh
+```text
 cargo test --locked
 cargo build --release --locked
 ```

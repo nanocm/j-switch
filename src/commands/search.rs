@@ -1,5 +1,5 @@
 use crate::downloader::adoptium::AdoptiumSource;
-use crate::downloader::traits::JdkSource;
+use crate::downloader::traits::{JdkPackage, JdkSource};
 use crate::error::Result;
 use colored::Colorize;
 use std::collections::HashMap;
@@ -16,13 +16,7 @@ pub async fn search_command(keyword: Option<String>) -> Result<()> {
     );
 
     if let Some(keyword) = keyword {
-        let keyword_lower = keyword.to_lowercase();
-
-        packages.retain(|p| {
-            p.version.to_lowercase().contains(&keyword_lower)
-                || p.vendor.to_lowercase().contains(&keyword_lower)
-                || p.major_version.to_string() == keyword
-        });
+        packages.retain(|p| matches_keyword(p, &keyword));
         println!(
             "{}",
             format!(
@@ -80,4 +74,41 @@ pub async fn search_command(keyword: Option<String>) -> Result<()> {
              "jsh download <version>".green());
 
     Ok(())
+}
+
+fn matches_keyword(package: &JdkPackage, keyword: &str) -> bool {
+    if let Ok(major) = keyword.parse::<u32>() {
+        return package.major_version == major;
+    }
+    let keyword = keyword.to_lowercase();
+    package.version.to_lowercase().contains(&keyword)
+        || package.vendor.to_lowercase().contains(&keyword)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn package(major_version: u32) -> JdkPackage {
+        JdkPackage {
+            version: format!("{major_version}.0.1+1"),
+            runtime_version: None,
+            major_version,
+            vendor: "temurin".to_string(),
+            os: "windows".to_string(),
+            arch: "x64".to_string(),
+            download_url: String::new(),
+            size: 0,
+            file_type: "zip".to_string(),
+            is_lts: false,
+            checksum: None,
+        }
+    }
+
+    #[test]
+    fn numeric_search_matches_only_the_major_version() {
+        assert!(matches_keyword(&package(8), "8"));
+        assert!(!matches_keyword(&package(18), "8"));
+        assert!(matches_keyword(&package(18), "temurin"));
+    }
 }
