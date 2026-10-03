@@ -1,15 +1,17 @@
-# j-switch v0.2.0
+# j-switch v0.3.0
 
-Manage installed JDKs and download Eclipse Temurin builds with `jsh`.
+Choose where downloaded JDKs are installed with `install_dir` in `config.json` beside `jsh`:
 
-## Changes
+```json
+{
+  "install_dir": "managed-jdks",
+  "download_dir": "downloads",
+  "scan_dirs": []
+}
+```
 
-- `jsh download` verifies archive size and SHA-256, installs the JDK, and registers it immediately. Windows JDK 8 packages are recognized correctly after extraction.
-- Installations with the same Java version keep separate IDs, which `jsh use` accepts when a version is ambiguous.
-- Numeric `jsh search` queries match the exact major version, so `jsh search 8` does not include JDK 18.
-- `jsh list` checks managed installs, `JAVA_HOME`, and configured `scan_dirs` by default. Use `--scan` for a broader system search or `--prune` to remove unavailable registrations.
-- Windows uses a user-scoped `JAVA_HOME` and a stable directory junction. Bash and zsh use a stable symbolic link, so later switches can take effect in an open terminal.
+`install_dir` holds extracted JDKs; `download_dir` remains the verified archive cache. Paths may be absolute or relative to the executable. Existing installations are not moved, and `jsh list` continues to discover the original `jdks` directory after you change `install_dir`.
 
-After the first `jsh use`, reopen the terminal once on Windows or source the updated shell profile once on macOS or Linux. The active shell must find Java through `jsh-current/bin` for later switches to take effect immediately.
+The README now has a visual quick start and matching English and Chinese guides.
 
-Downloads currently use Eclipse Temurin. `--vendor temurin` and `--vendor adoptium` name the same source.
+After the first `jsh use`, reopen the terminal once on Windows or source your shell profile once on macOS or Linux. Later switches can take effect in the open terminal.

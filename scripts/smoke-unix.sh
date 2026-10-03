@@ -14,6 +14,7 @@ pathlib.Path(sys.argv[1]).write_text(json.dumps({
     "current_jdk": None,
     "jdks": {},
     "download_dir": "downloads",
+    "install_dir": "managed-jdks",
     "scan_dirs": [sys.argv[2]],
 }), encoding="utf-8")
 PY
@@ -26,9 +27,20 @@ export NO_COLOR=1
 grep -Fq 'JDK 17' "$smoke_root/list-before.txt"
 
 "$smoke_root/jsh" download 21
+python3 - "$smoke_root/config.json" <<'PY'
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+config = json.loads(path.read_text(encoding="utf-8"))
+config["jdks"] = {}
+path.write_text(json.dumps(config), encoding="utf-8")
+PY
 "$smoke_root/jsh" list > "$smoke_root/list-after.txt"
 grep -Fq 'JDK 17' "$smoke_root/list-after.txt"
 grep -Fq 'JDK 21' "$smoke_root/list-after.txt"
+grep -Fq "$smoke_root/managed-jdks" "$smoke_root/list-after.txt"
 
 "$smoke_root/jsh" use 17
 source "$HOME/.bashrc"

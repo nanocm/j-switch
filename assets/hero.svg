@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 380" role="img" aria-labelledby="title desc">
+  <title id="title">j-switch</title>
+  <desc id="desc">A terminal workflow for listing, downloading, and switching JDKs with jsh.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#101c32"/>
+      <stop offset="1" stop-color="#0b1426"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#39d4c5"/>
+      <stop offset="1" stop-color="#438dff"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0" stop-color="#2465a0" stop-opacity=".34"/>
+      <stop offset="1" stop-color="#2465a0" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect x="1" y="1" width="1098" height="378" rx="25" fill="url(#background)" stroke="#263c5a" stroke-width="2"/>
+  <circle cx="536" cy="332" r="330" fill="url(#glow)"/>
+  <path d="M0 315 475 0" stroke="#4cb9d5" stroke-opacity=".08" stroke-width="2"/>
+  <path d="M105 380 675 0" stroke="#4cb9d5" stroke-opacity=".06" stroke-width="2"/>
+
+  <rect x="58" y="52" width="47" height="47" rx="13" fill="url(#accent)"/>
+  <text x="81.5" y="86" text-anchor="middle" font-family="Arial, sans-serif" font-size="31" font-weight="700" fill="#08172b">J</text>
+  <text x="124" y="84" font-family="Arial, sans-serif" font-size="25" font-weight="700" fill="#f4f8ff">j-switch</text>
+  <text x="60" y="158" font-family="Arial, sans-serif" font-size="14" font-weight="700" letter-spacing="3" fill="#76bccc">JDK MANAGER</text>
+  <text x="53" y="260" font-family="Arial, sans-serif" font-size="112" font-weight="700" letter-spacing="-8" fill="#f5f8ff">jsh</text>
+  <rect x="60" y="294" width="436" height="1" fill="#46627e" opacity=".8"/>
+  <text x="60" y="333" font-family="Consolas, Menlo, monospace" font-size="19" fill="#a9c6d9">list</text>
+  <path d="M130 325h36m-8-7 8 7-8 7" fill="none" stroke="#4fd7c3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="184" y="333" font-family="Consolas, Menlo, monospace" font-size="19" fill="#a9c6d9">download</text>
+  <path d="M300 325h36m-8-7 8 7-8 7" fill="none" stroke="#4fd7c3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="354" y="333" font-family="Consolas, Menlo, monospace" font-size="19" fill="#a9c6d9">use</text>
+
+  <rect x="575" y="51" width="468" height="278" rx="16" fill="#081221" stroke="#38506d" stroke-width="2"/>
+  <path d="M576 104h466" stroke="#38506d"/>
+  <circle cx="603" cy="78" r="5" fill="#fa7875"/>
+  <circle cx="623" cy="78" r="5" fill="#f5bd60"/>
+  <circle cx="643" cy="78" r="5" fill="#5acb8d"/>
+  <text x="809" y="83" text-anchor="middle" font-family="Consolas, Menlo, monospace" font-size="13" fill="#8096af">terminal</text>
+
+  <text x="604" y="141" font-family="Consolas, Menlo, monospace" font-size="20" fill="#46d2be">$</text>
+  <text x="629" y="141" font-family="Consolas, Menlo, monospace" font-size="20" fill="#e8f1fc">jsh list</text>
+  <text x="629" y="174" font-family="Consolas, Menlo, monospace" font-size="17" fill="#9eb4cd">JDK 17</text>
+  <text x="789" y="174" font-family="Consolas, Menlo, monospace" font-size="17" fill="#68859e">Temurin</text>
+  <text x="629" y="204" font-family="Consolas, Menlo, monospace" font-size="17" fill="#dce9fa">JDK 21</text>
+  <text x="789" y="204" font-family="Consolas, Menlo, monospace" font-size="17" fill="#68859e">Temurin</text>
+  <text x="604" y="248" font-family="Consolas, Menlo, monospace" font-size="20" fill="#46d2be">$</text>
+  <text x="629" y="248" font-family="Consolas, Menlo, monospace" font-size="20" fill="#e8f1fc">jsh use 21</text>
+  <circle cx="615" cy="289" r="11" fill="#174c48"/>
+  <path d="m610 289 4 4 7-8" fill="none" stroke="#5ce0bd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="637" y="296" font-family="Consolas, Menlo, monospace" font-size="17" fill="#5ce0bd">Java 21 active</text>
+</svg>

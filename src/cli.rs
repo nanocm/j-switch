@@ -9,7 +9,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// List registered JDKs, managed downloads, configured scan_dirs, and JAVA_HOME
+    /// List registered JDKs, managed installs, configured scan_dirs, and JAVA_HOME
     List {
         /// Also scan common system locations (can be slow)
         #[arg(long)]

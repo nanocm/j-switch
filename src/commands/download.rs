@@ -36,7 +36,7 @@ pub async fn download_command(version: &str, vendor: &str) -> Result<()> {
     if package.is_lts { println!("  Support:     {}", "LTS (Long Term Support)".green()); }
 
     let extractor = Extractor::new();
-    let install_base = Config::config_dir()?.join("jdks");
+    let install_base = Config::load()?.install_dir()?;
     std::fs::create_dir_all(&install_base)?;
     let release_name = release_name(&package);
     let install_dir = install_base.join(&release_name);

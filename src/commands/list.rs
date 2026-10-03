@@ -10,7 +10,7 @@ pub fn list_command(scan_system: bool, prune: bool) -> Result<()> {
     if scan_system {
         println!("{}", "Scanning managed, configured, and system locations...".cyan());
     } else {
-        println!("{}", "Checking registered JDKs, managed downloads, configured directories, and JAVA_HOME...".cyan());
+        println!("{}", "Checking registered JDKs, managed installs, configured directories, and JAVA_HOME...".cyan());
     }
     manager.scan_jdks(scan_system)?;
     if prune {

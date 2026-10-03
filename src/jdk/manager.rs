@@ -21,8 +21,7 @@ impl JdkManager {
     /// because walking drive roots makes an ordinary list unnecessarily slow.
     pub fn scan_jdks(&mut self, scan_system: bool) -> Result<Vec<JdkInfo>> {
         let config_dir = Config::config_dir()?;
-        let managed_dir = config_dir.join("jdks");
-        let mut search_dirs = vec![managed_dir];
+        let mut search_dirs = self.config.managed_install_dirs()?;
         for dir in &self.config.scan_dirs {
             let resolved = if dir.is_absolute() { dir.clone() } else { config_dir.join(dir) };
             if !search_dirs.iter().any(|existing| same_jdk_path(existing, &resolved)) {

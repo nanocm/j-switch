@@ -16,11 +16,24 @@ pub struct JdkInfo {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
+    #[serde(default)]
     pub current_jdk: Option<String>,
+    #[serde(default)]
     pub jdks: HashMap<String, JdkInfo>,
+    #[serde(default = "default_download_dir")]
     pub download_dir: PathBuf,
+    #[serde(default = "default_install_dir")]
+    pub install_dir: PathBuf,
     #[serde(default)]
     pub scan_dirs: Vec<PathBuf>,
+}
+
+fn default_download_dir() -> PathBuf {
+    PathBuf::from("downloads")
+}
+
+fn default_install_dir() -> PathBuf {
+    PathBuf::from("jdks")
 }
 
 /// Use the canonical path when possible so alternate spellings of one install
@@ -55,6 +68,42 @@ pub fn jdk_id(info: &JdkInfo) -> String {
 }
 
 impl Config {
+    fn resolve_directory(config_dir: &Path, configured: &Path, key: &str) -> Result<PathBuf> {
+        if configured.as_os_str().is_empty() {
+            return Err(JdkError::ConfigError(format!("{key} cannot be empty")));
+        }
+        Ok(if configured.is_absolute() {
+            configured.to_path_buf()
+        } else {
+            config_dir.join(configured)
+        })
+    }
+
+    pub fn archive_dir(&self) -> Result<PathBuf> {
+        Self::resolve_directory(&Self::config_dir()?, &self.download_dir, "download_dir")
+    }
+
+    pub fn install_dir(&self) -> Result<PathBuf> {
+        Self::resolve_directory(&Self::config_dir()?, &self.install_dir, "install_dir")
+    }
+
+    /// Continue finding installations in the original directory after the
+    /// user changes install_dir. Existing JDKs are not moved automatically.
+    pub fn managed_install_dirs(&self) -> Result<Vec<PathBuf>> {
+        let config_dir = Self::config_dir()?;
+        self.managed_install_dirs_at(&config_dir)
+    }
+
+    fn managed_install_dirs_at(&self, config_dir: &Path) -> Result<Vec<PathBuf>> {
+        let selected = Self::resolve_directory(config_dir, &self.install_dir, "install_dir")?;
+        let legacy = config_dir.join("jdks");
+        let mut dirs = vec![selected];
+        if !same_jdk_path(&dirs[0], &legacy) {
+            dirs.push(legacy);
+        }
+        Ok(dirs)
+    }
+
     pub fn config_dir() -> Result<PathBuf> {
         let exe_path = std::env::current_exe()
             .map_err(|e| JdkError::ConfigError(format!("Cannot get executable path: {e}")))?;
@@ -161,7 +210,8 @@ impl Default for Config {
         Self {
             current_jdk: None,
             jdks: HashMap::new(),
-            download_dir: PathBuf::from("downloads"),
+            download_dir: default_download_dir(),
+            install_dir: default_install_dir(),
             scan_dirs: Vec::new(),
         }
     }
@@ -217,10 +267,48 @@ mod tests {
         let legacy = r#"{"current_jdk":null,"jdks":{},"download_dir":"downloads"}"#;
         let config: Config = serde_json::from_str(legacy).unwrap();
         assert!(config.scan_dirs.is_empty());
+        assert_eq!(config.install_dir, PathBuf::from("jdks"));
 
-        let customized = r#"{"current_jdk":null,"jdks":{},"download_dir":"downloads","scan_dirs":["D:\\Java","E:\\SDKs"]}"#;
+        let minimal: Config = serde_json::from_str(r#"{"install_dir":"other-jdks"}"#).unwrap();
+        assert!(minimal.jdks.is_empty());
+        assert!(minimal.current_jdk.is_none());
+        assert_eq!(minimal.download_dir, PathBuf::from("downloads"));
+        assert_eq!(minimal.install_dir, PathBuf::from("other-jdks"));
+
+        let customized = r#"{"current_jdk":null,"jdks":{},"download_dir":"downloads","install_dir":"E:\\Java","scan_dirs":["D:\\Java","E:\\SDKs"]}"#;
         let config: Config = serde_json::from_str(customized).unwrap();
+        assert_eq!(config.install_dir, PathBuf::from("E:\\Java"));
         assert_eq!(config.scan_dirs, vec![PathBuf::from("D:\\Java"), PathBuf::from("E:\\SDKs")]);
+    }
+
+    #[test]
+    fn custom_install_dir_keeps_legacy_installs_discoverable() {
+        let base = Path::new("base");
+        let mut config = Config::default();
+        assert_eq!(
+            config.managed_install_dirs_at(base).unwrap(),
+            vec![base.join("jdks")]
+        );
+
+        config.install_dir = PathBuf::from("other-jdks");
+        assert_eq!(
+            config.managed_install_dirs_at(base).unwrap(),
+            vec![base.join("other-jdks"), base.join("jdks")]
+        );
+
+        let absolute = std::env::current_dir().unwrap().join("external-jdks");
+        config.install_dir = absolute.clone();
+        assert_eq!(
+            config.managed_install_dirs_at(base).unwrap(),
+            vec![absolute, base.join("jdks")]
+        );
+
+        config.install_dir = PathBuf::new();
+        assert!(config.managed_install_dirs_at(base).is_err());
+        assert_eq!(
+            Config::resolve_directory(base, Path::new("cache"), "download_dir").unwrap(),
+            base.join("cache")
+        );
     }
 
     #[test]

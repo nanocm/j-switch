@@ -23,17 +23,26 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $env:NO_COLOR = '1'
           $jsh = Join-Path $PWD 'target\release\jsh.exe'
+          $configPath = Join-Path (Split-Path $jsh) 'config.json'
+          @{ install_dir = 'managed-jdks'; download_dir = 'downloads' } |
+            ConvertTo-Json | Set-Content -LiteralPath $configPath -Encoding UTF8
           $list = & $jsh list
           if ($LASTEXITCODE -ne 0 -or -not ($list | Select-String -SimpleMatch 'JDK 17')) {
             throw "Java 17 is missing from jsh list"
           }
           & $jsh download 8
           if ($LASTEXITCODE -ne 0) { throw "jsh download 8 failed" }
+          $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
+          $config.jdks = @{}
+          $config | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $configPath -Encoding UTF8
           $list = & $jsh list
           if ($LASTEXITCODE -ne 0) { throw "jsh list failed" }
           $list | Write-Output
           if (-not ($list | Select-String -SimpleMatch 'JDK 8')) {
             throw "Downloaded JDK 8 is missing from jsh list"
+          }
+          if (-not ($list | Select-String -SimpleMatch 'managed-jdks')) {
+            throw "Downloaded JDK 8 was not discovered in the configured install directory"
           }
           & $jsh use 17
           if ($LASTEXITCODE -ne 0) { throw "jsh use 17 failed" }
