@@ -12,9 +12,27 @@
   <a href="RELEASE_NOTES.md">更新说明</a>
 </p>
 
-## 快速开始
+## 安装
 
-下载适用于 **Windows x64**、**Linux x64** 或 **macOS x64 / ARM64** 的发布包。将 `jsh.exe`（或 `jsh`）放在当前用户可写的目录，并把该目录加入 `PATH`。
+安装脚本会下载适合当前平台的发布包，校验 SHA-256；如果安装目录不在 `PATH` 中，会先询问是否写入用户级 `PATH`。
+
+**Windows x64 · PowerShell**
+
+```powershell
+Invoke-WebRequest https://github.com/nanocm/j-switch/releases/latest/download/install.ps1 -OutFile install.ps1 -UseBasicParsing
+powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1
+```
+
+**Linux x64 · macOS x64 / ARM64**
+
+```bash
+curl -fsSL https://github.com/nanocm/j-switch/releases/latest/download/install.sh -o install.sh
+bash install.sh
+```
+
+Windows 默认安装到 `%LOCALAPPDATA%\Programs\jsh`，Unix 默认安装到 `~/.local/bin`。可用 `-InstallDir 'D:\Tools\jsh'` 或 `--dir "$HOME/tools"` 指定用户可写目录。无人值守安装可加 `-PathAction Add` / `--add-to-path`；自行配置 `PATH` 时可加 `-PathAction Skip` / `--skip-path`。安装器修改 `PATH` 后请新开终端。也可[手动下载发布包](https://github.com/nanocm/j-switch/releases/latest)。
+
+## 快速开始
 
 ```console
 jsh list          # 查找已安装的 JDK
@@ -33,7 +51,7 @@ jsh current       # 检查当前 Java
 
 ## 自定义 JDK 目录
 
-在 `jsh` 可执行文件旁创建或编辑 `config.json`：
+在 `jsh` 可执行文件旁创建或编辑 `jsh_config.json`：
 
 ```json
 {
@@ -50,6 +68,8 @@ jsh current       # 检查当前 Java
 | `scan_dirs` | `jsh list` 额外检查的已有目录；默认不添加。 |
 
 相对路径以可执行文件所在目录为基准；也支持绝对路径，例如 Windows 的 `D:\Java\JDKs` 或 Unix 的 `/opt/jdks`。修改 `install_dir` 不会移动已有 JDK；`jsh list` 仍会检查原来的 `jdks` 目录。
+
+首次运行时会自动导入旧版 jsh 的 `config.json`，旧文件会保留作为备份；此后优先读取 `jsh_config.json`。
 
 ## 命令
 

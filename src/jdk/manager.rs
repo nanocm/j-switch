@@ -12,8 +12,9 @@ pub struct JdkManager {
 impl JdkManager {
     pub fn new() -> Result<Self> {
         let lock = Config::lock_registry()?;
-        let mut config = Config::load()?;
-        if config.normalize_registry()? { config.save()?; }
+        let (mut config, from_legacy) = Config::load_with_source()?;
+        let normalized = config.normalize_registry()?;
+        if from_legacy || normalized { config.save()?; }
         Ok(Self { config, _registry_lock: Some(lock) })
     }
 

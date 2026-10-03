@@ -23,7 +23,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $env:NO_COLOR = '1'
           $jsh = Join-Path $PWD 'target\release\jsh.exe'
-          $configPath = Join-Path (Split-Path $jsh) 'config.json'
+          $configPath = Join-Path (Split-Path $jsh) 'jsh_config.json'
           @{ install_dir = 'managed-jdks'; download_dir = 'downloads' } |
             ConvertTo-Json | Set-Content -LiteralPath $configPath -Encoding UTF8
           $list = & $jsh list

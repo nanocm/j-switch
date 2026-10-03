@@ -31,7 +31,7 @@ pub fn list_command(scan_system: bool, prune: bool) -> Result<()> {
         println!("{}", "No available JDK installations found.".yellow());
         print_unavailable(&unavailable);
         if !scan_system {
-            println!("Add scan_dirs to config.json or run {} to discover other JDKs.", "jsh list --scan".green());
+            println!("Add scan_dirs to jsh_config.json or run {} to discover other JDKs.", "jsh list --scan".green());
         }
         return Ok(());
     }

@@ -32,3 +32,27 @@ jobs:
         run: cargo test --locked
       - name: Build
         run: cargo build --release --locked
+      - name: Install script smoke (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installDir = Join-Path $env:RUNNER_TEMP 'jsh installer smoke'
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1 -InstallDir $installDir -PathAction Add
+          if ($LASTEXITCODE -ne 0) { throw 'Windows PowerShell installer failed' }
+          if (-not ([Environment]::GetEnvironmentVariable('Path', 'User') -split ';' -contains $installDir)) {
+            throw 'Installer did not add the directory to user PATH'
+          }
+          & (Join-Path $installDir 'jsh.exe') --version
+          if ($LASTEXITCODE -ne 0) { throw 'Installed jsh failed' }
+      - name: Install script smoke (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          bash -n scripts/install.sh
+          test_home="$RUNNER_TEMP/jsh-installer-home"
+          mkdir -p "$test_home"
+          HOME="$test_home" SHELL=/bin/bash bash scripts/install.sh --dir "$test_home/jsh bin" --add-to-path
+          if [[ "$(uname -s)" == Darwin ]]; then profile="$test_home/.bash_profile"; else profile="$test_home/.bashrc"; fi
+          source "$profile"
+          command -v jsh
+          jsh --version

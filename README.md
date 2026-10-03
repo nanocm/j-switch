@@ -12,9 +12,27 @@
   <a href="RELEASE_NOTES.md">Release notes</a>
 </p>
 
-## Quick start
+## Install
 
-Download the release for **Windows x64**, **Linux x64**, or **macOS x64 / ARM64**. Place `jsh.exe` (or `jsh`) in a directory you can write to, then add that directory to `PATH`.
+The installer downloads the matching release, checks its SHA-256, and asks before adding the install directory to your user `PATH` when needed.
+
+**Windows x64 · PowerShell**
+
+```powershell
+Invoke-WebRequest https://github.com/nanocm/j-switch/releases/latest/download/install.ps1 -OutFile install.ps1 -UseBasicParsing
+powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1
+```
+
+**Linux x64 · macOS x64 / ARM64**
+
+```bash
+curl -fsSL https://github.com/nanocm/j-switch/releases/latest/download/install.sh -o install.sh
+bash install.sh
+```
+
+Windows defaults to `%LOCALAPPDATA%\Programs\jsh`; Unix defaults to `~/.local/bin`. Choose a writable directory with `-InstallDir 'D:\Tools\jsh'` or `--dir "$HOME/tools"`. Use `-PathAction Add` / `--add-to-path` for unattended setup, or `-PathAction Skip` / `--skip-path` to manage `PATH` yourself. Open a new terminal after the installer changes `PATH`. [Manual downloads](https://github.com/nanocm/j-switch/releases/latest) are also available.
+
+## Quick start
 
 ```console
 jsh list          # Find installed JDKs
@@ -33,7 +51,7 @@ Later switches take effect in the same open terminal. If another Java comes firs
 
 ## Put JDKs where you want
 
-Create or edit `config.json` beside `jsh`:
+Create or edit `jsh_config.json` beside `jsh`:
 
 ```json
 {
@@ -50,6 +68,8 @@ Create or edit `config.json` beside `jsh`:
 | `scan_dirs` | Extra existing directories checked by `jsh list`. Default: none. |
 
 Relative paths start beside the executable. Absolute paths work too, for example `D:\Java\JDKs` on Windows or `/opt/jdks` on Unix. Changing `install_dir` does not move existing JDKs; `jsh list` still checks the original `jdks` directory.
+
+An existing jsh `config.json` is imported automatically on first run. The old file is kept as a backup; `jsh_config.json` takes precedence thereafter.
 
 ## Commands
 

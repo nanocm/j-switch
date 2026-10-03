@@ -6,6 +6,10 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+const CONFIG_FILE: &str = "jsh_config.json";
+const LEGACY_CONFIG_FILE: &str = "config.json";
+const LOCK_FILE: &str = "jsh_config.lock";
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct JdkInfo {
     pub path: PathBuf,
@@ -112,16 +116,48 @@ impl Config {
     }
 
     pub fn config_path() -> Result<PathBuf> {
-        Ok(Self::config_dir()?.join("config.json"))
+        Ok(Self::config_dir()?.join(CONFIG_FILE))
     }
 
     pub fn load() -> Result<Self> {
-        let path = Self::config_path()?;
-        if !path.exists() { return Ok(Self::default()); }
+        Ok(Self::load_with_source()?.0)
+    }
+
+    /// Read the new filename first. An old config.json is imported only when
+    /// its shape matches a jsh registry, so unrelated files are left alone.
+    pub fn load_with_source() -> Result<(Self, bool)> {
+        Self::load_from_dir(&Self::config_dir()?)
+    }
+
+    fn load_from_dir(dir: &Path) -> Result<(Self, bool)> {
+        let path = dir.join(CONFIG_FILE);
+        if path.exists() { return Ok((Self::read_from_path(&path)?, false)); }
+
+        let legacy = dir.join(LEGACY_CONFIG_FILE);
+        if !legacy.is_file() { return Ok((Self::default(), false)); }
+        let content = fs::read_to_string(&legacy)
+            .map_err(|e| JdkError::ConfigError(format!("Failed to read {}: {e}", legacy.display())))?;
+        let value: serde_json::Value = match serde_json::from_str(&content) {
+            Ok(value) => value,
+            Err(_) if !content.contains("\"jdks\"") => return Ok((Self::default(), false)),
+            Err(error) => return Err(JdkError::ConfigError(format!(
+                "Failed to parse legacy jsh config {}: {error}", legacy.display()
+            ))),
+        };
+        let is_jsh_config = value.as_object().is_some_and(|object| {
+            ["current_jdk", "jdks", "download_dir"].iter().all(|key| object.contains_key(*key))
+        });
+        if !is_jsh_config { return Ok((Self::default(), false)); }
+        let config = serde_json::from_value(value)
+            .map_err(|e| JdkError::ConfigError(format!("Failed to parse legacy jsh config {}: {e}", legacy.display())))?;
+        Ok((config, true))
+    }
+
+    fn read_from_path(path: &Path) -> Result<Self> {
         let content = fs::read_to_string(&path)
-            .map_err(|e| JdkError::ConfigError(format!("Failed to read config: {e}")))?;
+            .map_err(|e| JdkError::ConfigError(format!("Failed to read {}: {e}", path.display())))?;
         serde_json::from_str(&content)
-            .map_err(|e| JdkError::ConfigError(format!("Failed to parse config: {e}")))
+            .map_err(|e| JdkError::ConfigError(format!("Failed to parse {}: {e}", path.display())))
     }
 
     pub fn save(&self) -> Result<()> {
@@ -153,7 +189,7 @@ impl Config {
         let dir = Self::config_dir()?;
         fs::create_dir_all(&dir)
             .map_err(|e| JdkError::ConfigError(format!("Failed to create config dir: {e}")))?;
-        let lock_path = dir.join("config.lock");
+        let lock_path = dir.join(LOCK_FILE);
         let file = OpenOptions::new().read(true).write(true).create(true).open(lock_path)
             .map_err(|e| JdkError::ConfigError(format!("Failed to open config lock: {e}")))?;
         fs2::FileExt::lock_exclusive(&file)
@@ -314,12 +350,39 @@ mod tests {
     #[test]
     fn atomic_save_replaces_an_existing_config() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("config.json");
+        let path = dir.path().join(CONFIG_FILE);
         let mut config = Config::default();
         config.save_to_path(&path).unwrap();
         config.scan_dirs.push(PathBuf::from("custom"));
         config.save_to_path(&path).unwrap();
         let loaded: Config = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
         assert_eq!(loaded.scan_dirs, vec![PathBuf::from("custom")]);
+    }
+
+    #[test]
+    fn old_config_is_imported_only_when_it_belongs_to_jsh() {
+        let dir = tempfile::tempdir().unwrap();
+        let legacy_path = dir.path().join(LEGACY_CONFIG_FILE);
+        let new_path = dir.path().join(CONFIG_FILE);
+        fs::write(&legacy_path, r#"{"application":"unrelated"}"#).unwrap();
+        let (config, from_legacy) = Config::load_from_dir(dir.path()).unwrap();
+        assert!(!from_legacy);
+        assert!(config.jdks.is_empty());
+
+        let mut old_config = Config::default();
+        old_config.install_dir = PathBuf::from("other-jdks");
+        fs::write(&legacy_path, serde_json::to_string(&old_config).unwrap()).unwrap();
+        let (config, from_legacy) = Config::load_from_dir(dir.path()).unwrap();
+        assert!(from_legacy);
+        assert_eq!(config.install_dir, PathBuf::from("other-jdks"));
+        config.save_to_path(&new_path).unwrap();
+        assert!(legacy_path.is_file());
+
+        let mut new_config = Config::default();
+        new_config.install_dir = PathBuf::from("new-jdks");
+        new_config.save_to_path(&new_path).unwrap();
+        let (loaded, from_legacy) = Config::load_from_dir(dir.path()).unwrap();
+        assert!(!from_legacy);
+        assert_eq!(loaded.install_dir, PathBuf::from("new-jdks"));
     }
 }

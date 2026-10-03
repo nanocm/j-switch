@@ -5,7 +5,7 @@ original_java_home="${JAVA_HOME:?actions/setup-java must provide JAVA_HOME}"
 smoke_root="$(mktemp -d)"
 cp target/release/jsh "$smoke_root/jsh"
 mkdir -p "$smoke_root/home"
-python3 - "$smoke_root/config.json" "$original_java_home" <<'PY'
+python3 - "$smoke_root/jsh_config.json" "$original_java_home" <<'PY'
 import json
 import pathlib
 import sys
@@ -27,7 +27,7 @@ export NO_COLOR=1
 grep -Fq 'JDK 17' "$smoke_root/list-before.txt"
 
 "$smoke_root/jsh" download 21
-python3 - "$smoke_root/config.json" <<'PY'
+python3 - "$smoke_root/jsh_config.json" <<'PY'
 import json
 import pathlib
 import sys

@@ -1,17 +1,11 @@
-# j-switch v0.3.0
+# j-switch v0.4.0
 
-Choose where downloaded JDKs are installed with `install_dir` in `config.json` beside `jsh`:
+## Install from GitHub
 
-```json
-{
-  "install_dir": "managed-jdks",
-  "download_dir": "downloads",
-  "scan_dirs": []
-}
-```
+`install.ps1` and `install.sh` download the matching Windows x64, Linux x64, or macOS x64/ARM64 release, verify its SHA-256 checksum, and install `jsh` into a user-writable directory. Both scripts accept a custom directory. If that directory is missing from `PATH`, they ask before adding it to the user's environment or shell profile. The scripts and their checksums are included in this release.
 
-`install_dir` holds extracted JDKs; `download_dir` remains the verified archive cache. Paths may be absolute or relative to the executable. Existing installations are not moved, and `jsh list` continues to discover the original `jdks` directory after you change `install_dir`.
+## Configuration filename
 
-The README now has a visual quick start and matching English and Chinese guides.
+The configuration beside `jsh` is now named `jsh_config.json`, avoiding collisions with an unrelated `config.json` in the executable directory. On first run, an existing jsh `config.json` is imported into the new file; the old file remains in place. The new file takes precedence once it exists.
 
-After the first `jsh use`, reopen the terminal once on Windows or source your shell profile once on macOS or Linux. Later switches can take effect in the open terminal.
+See the [English](https://github.com/nanocm/j-switch/blob/v0.4.0/README.md) and [中文](https://github.com/nanocm/j-switch/blob/v0.4.0/README.zh-CN.md) guides for installation commands and directory settings.
